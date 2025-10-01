@@ -60,6 +60,26 @@ func (es *voyageService) GenerateEmbedding(ctx context.Context, text string, emb
 	return embeddings.Data[0].Embedding, nil
 }
 
+// GenerateEmbeddings generates embeddings for multiple texts using VoyageAI
+func (es *voyageService) GenerateEmbeddings(ctx context.Context, texts []string, embeddingType VoyageEmbeddingType) ([]voyageai.EmbeddingObject, error) {
+	dimensions := es.GetEmbeddingDimensions()
+	inputType := string(embeddingType)
+	embeddings, err := client.Embed(
+		texts,
+		VOYAGEAI_EMBEDDING_MODEL,
+		&voyageai.EmbeddingRequestOpts{
+			InputType:       &inputType,
+			OutputDimension: &dimensions,
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("could not get embeddings: %w", err)
+	}
+
+	return embeddings.Data, nil
+}
+
 // GetEmbeddingDimensions returns the dimension count for the embedding model
 func (es *voyageService) GetEmbeddingDimensions() int {
 	return EMBEDDING_DIMENSIONS
