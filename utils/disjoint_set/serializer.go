@@ -1,4 +1,4 @@
-package dsu
+package disjoint_set
 
 import (
 	"encoding/json"

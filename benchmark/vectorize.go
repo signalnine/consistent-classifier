@@ -3,8 +3,10 @@ package benchmark
 import (
 	"context"
 	"log"
+	"os"
 
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
+	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
 )
 
 type DatasetItem struct {
@@ -31,8 +33,13 @@ type ContentVectorHit struct {
 func Vectorize() {
 	// Prepare
 	voyageClient := voyage.NewEmbeddingService()
+	DSU := disjoint_set.NewDSU(0)
 	dataset := []DatasetItem{}
 	results := make([]Result, 0)
+
+	// Read the DSU from file
+	filepath := os.Getenv("DSU_FILEPATH")
+	DSU.ReadFromFile(filepath)
 
 	// Generate embeddings for the entire dataset
 	texts := []string{}
