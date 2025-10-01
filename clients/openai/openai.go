@@ -1,4 +1,4 @@
-package groq
+package openai
 
 import (
 	"bufio"
@@ -12,85 +12,72 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/retry"
+	"github.com/FrenchMajesty/consistent-classifier/clients/groq"
+	"github.com/FrenchMajesty/consistent-classifier/utils/retry"
 	"github.com/google/uuid"
+	openai "github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
 )
 
-const groqBaseURL = "https://api.groq.com/openai/v1"
+const openaiBaseURL = "https://api.openai.com/v1"
 
-// ChatCompletionError wraps standard errors with raw response body for error logging
-type ChatCompletionError struct {
-	Message    string          `json:"message"`
-	StatusCode int             `json:"status_code,omitempty"`
-	RawBody    json.RawMessage `json:"raw_body,omitempty"`
-}
-
-func (e *ChatCompletionError) Error() string {
-	return e.Message
-}
-
-// GetRawResponseBody returns the raw response body if available
-func (e *ChatCompletionError) GetRawResponseBody() json.RawMessage {
-	return e.RawBody
-}
-
-type ModelName string
+const EmbeddingVectorDimensions = 1024
 
 var (
-	ModelLlama3370bVersatile ModelName = "llama-3.3-70b-versatile"
-	ModelDeepseekR1          ModelName = "deepseek-r1-distill-llama-70b"
-	ModelQwen332B            ModelName = "qwen/qwen-3.3-2b-instruct"
-	ModelOss20B              ModelName = "openai/gpt-oss-20b"
-	ModelOss120B             ModelName = "openai/gpt-oss-120b"
+	client openai.Client
+	once   sync.Once
 )
 
-// GroqClient is a minimal client for the Groq Chat API
-type GroqClient struct {
+// OpenAIClient is a minimal client for the OpenAI Chat API
+type OpenAIClient struct {
 	APIKey      string
 	Env         string
 	HTTPClient  *http.Client
 	RetryConfig retry.Config
-	RetryChan   chan int
-	verboseLog  bool
-	evalMode    bool
 }
 
-type GroqClientInterface interface {
-	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error)
-	ChatCompletionStream(ctx context.Context, req ChatCompletionRequest, callback func(token string)) (*StreamingResult, error)
+type OpenAIClientInterface interface {
+	ChatCompletion(ctx context.Context, req groq.ChatCompletionRequest) (*groq.ChatCompletionResponse, error)
+	ChatCompletionStream(ctx context.Context, req groq.ChatCompletionRequest, callback func(token string)) (*groq.StreamingResult, error)
+	GenerateEmbedding(ctx context.Context, text string) ([]float32, error)
+	GenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error)
 }
 
-// Creates a new GroqClient
-func NewGroqClient(apiKey string, env string) *GroqClient {
-	client := &GroqClient{
+// Ensure OpenAIClient implements GroqClientInterface for drop-in replacement
+var _ groq.GroqClientInterface = (*OpenAIClient)(nil)
+
+// Creates a new OpenAIClient
+func NewOpenAIClient(apiKey string, env string) *OpenAIClient {
+	client := &OpenAIClient{
 		APIKey:      apiKey,
 		Env:         env,
 		HTTPClient:  http.DefaultClient,
 		RetryConfig: retry.DefaultConfig(),
-		RetryChan:   make(chan int, 10),
-		verboseLog:  true,
-		evalMode:    false,
 	}
 
 	return client
 }
 
-// SetVerboseLog sets the verbose log flag
-func (c *GroqClient) SetVerboseLog(verboseLog bool) *GroqClient {
-	c.verboseLog = verboseLog
-	return c
+// InitSingletonClient initializes the singleton client
+func InitSingletonClient() openai.Client {
+	once.Do(func() {
+		client = NewClient()
+	})
+
+	return client
 }
 
-// SetEvalMode sets the eval mode flag
-func (c *GroqClient) SetEvalMode(evalMode bool) *GroqClient {
-	c.evalMode = evalMode
-	return c
+func NewClient() openai.Client {
+	return openai.NewClient(
+		option.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+	)
 }
 
 // isRetryableError determines if an error should trigger a retry
-func (c *GroqClient) isRetryableError(err error, statusCode int, responseBody []byte) bool {
+func (c *OpenAIClient) isRetryableError(err error, statusCode int, responseBody []byte) bool {
 	// Retry on network errors
 	if err != nil {
 		return true
@@ -102,17 +89,18 @@ func (c *GroqClient) isRetryableError(err error, statusCode int, responseBody []
 	}
 
 	// Retry on rate limiting (429)
-	if !c.evalMode && statusCode == 429 {
+	if statusCode == 429 {
 		return true
 	}
 
+	// OpenAI sometimes returns 400 for transient issues
 	if statusCode == 400 {
 		return true
 	}
 
-	// Check for failed_generation in response body
-	if responseBody != nil {
-		var errorResp ChatCompletionResponseError
+	// Check for failed_generation in response body even with 200 OK
+	if statusCode == 200 && responseBody != nil {
+		var errorResp groq.ChatCompletionResponseError
 		if json.Unmarshal(responseBody, &errorResp) == nil {
 			if errorResp.Error.FailedGeneration != "" ||
 				strings.Contains(errorResp.Error.Message, "failed_generation") {
@@ -124,43 +112,29 @@ func (c *GroqClient) isRetryableError(err error, statusCode int, responseBody []
 		if strings.Contains(string(responseBody), "failed_generation") {
 			return true
 		}
-
-		var successResp ChatCompletionResponse
-		if json.Unmarshal(responseBody, &successResp) == nil {
-			if len(successResp.Choices) > 0 && (successResp.Choices[0].FinishReason == "stop" || successResp.Choices[0].FinishReason == "length") {
-				content := successResp.Choices[0].Message.Content
-				if content == nil || *content == "" {
-					return true
-				}
-			}
-		}
 	}
 
 	return false
 }
 
-// Sends a chat completion request to Groq with retry logic
-func (c *GroqClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
-	url := groqBaseURL + "/chat/completions"
-
+// retryableRequest executes an HTTP request with retry logic
+func (c *OpenAIClient) retryableRequest(ctx context.Context, url string, requestBody any, apiName string) ([]byte, error) {
 	// Setup retry options
 	opts := retry.Options{
 		Config:       c.RetryConfig,
 		ErrorChecker: c.isRetryableError,
-		APIName:      "Groq",
-	}
-	if c.verboseLog {
-		opts.Logger = log.Printf
+		Logger:       log.Printf,
+		APIName:      "OpenAI " + apiName,
 	}
 
 	// Define the retryable function
 	retryableFn := func(attempt int) (interface{}, int, []byte, error) {
-		body, err := json.Marshal(req)
+		body, err := json.Marshal(requestBody)
 		if err != nil {
-			return nil, 0, nil, fmt.Errorf("failed to marshal request: %w", err)
+			return nil, 0, nil, fmt.Errorf("failed to marshal %s request: %w", apiName, err)
 		}
 
-		httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(body))
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to create HTTP request: %w", err)
 		}
@@ -169,7 +143,6 @@ func (c *GroqClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 
 		resp, err := c.HTTPClient.Do(httpReq)
 		if err != nil {
-			c.pushToRetryChan(attempt)
 			return nil, 0, nil, err
 		}
 		defer resp.Body.Close()
@@ -177,37 +150,28 @@ func (c *GroqClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 		// Read the response body once
 		bodyBytes, err := io.ReadAll(resp.Body)
 		if err != nil {
-			c.pushToRetryChan(attempt)
-			return nil, resp.StatusCode, nil, fmt.Errorf("failed to read response body: %w", err)
+			return nil, resp.StatusCode, nil, fmt.Errorf("failed to read %s response body: %w", apiName, err)
 		}
 
-		// Check if we should dump the request/response
-		if os.Getenv("DEBUG_LLM_REQUESTS") == "true" {
-			saveResponseToFile(req.Model, req, bodyBytes, resp.StatusCode)
+		// Check if we should dump the request/response (only for chat completions)
+		if apiName == "chat" {
+			if os.Getenv("DUMP_LLM_REQUESTS") == "true" {
+				if chatReq, ok := requestBody.(groq.ChatCompletionRequest); ok {
+					saveResponseToFile(chatReq.Model, chatReq, bodyBytes, resp.StatusCode)
+				}
+			}
 		}
 
 		// If we get here and status is not OK, it's an error
 		if resp.StatusCode != http.StatusOK {
-			c.pushToRetryChan(attempt)
-			return nil, resp.StatusCode, bodyBytes, &ChatCompletionError{
-				Message:    fmt.Sprintf("groq API error %d", resp.StatusCode),
+			return nil, resp.StatusCode, bodyBytes, &groq.ChatCompletionError{
+				Message:    fmt.Sprintf("openai %s API error %d", apiName, resp.StatusCode),
 				StatusCode: resp.StatusCode,
 				RawBody:    json.RawMessage(bodyBytes),
 			}
 		}
 
-		// Try to parse the successful response
-		var chatResp ChatCompletionResponse
-		if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
-			c.pushToRetryChan(attempt)
-			return nil, resp.StatusCode, bodyBytes, &ChatCompletionError{
-				Message:    fmt.Sprintf("failed to parse response: %v", err),
-				StatusCode: resp.StatusCode,
-				RawBody:    json.RawMessage(bodyBytes),
-			}
-		}
-
-		return &chatResp, resp.StatusCode, bodyBytes, nil
+		return bodyBytes, resp.StatusCode, bodyBytes, nil
 	}
 
 	// Execute with retry logic
@@ -216,14 +180,111 @@ func (c *GroqClient) ChatCompletion(ctx context.Context, req ChatCompletionReque
 		return nil, err
 	}
 
-	return result.(*ChatCompletionResponse), nil
+	return result.([]byte), nil
 }
 
-func saveResponseToFile(model string, req ChatCompletionRequest, bodyBytes []byte, statusCode int) {
+// Sends a chat completion request to OpenAI with retry logic
+func (c *OpenAIClient) ChatCompletion(ctx context.Context, req groq.ChatCompletionRequest) (*groq.ChatCompletionResponse, error) {
+	url := openaiBaseURL + "/chat/completions"
+
+	bodyBytes, err := c.retryableRequest(ctx, url, req, "chat")
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the successful response
+	var chatResp groq.ChatCompletionResponse
+	if err := json.Unmarshal(bodyBytes, &chatResp); err != nil {
+		return nil, &groq.ChatCompletionError{
+			Message: fmt.Sprintf("failed to parse chat completion response: %v", err),
+			RawBody: json.RawMessage(bodyBytes),
+		}
+	}
+
+	return &chatResp, nil
+}
+
+// EmbeddingRequest represents a request to OpenAI embeddings API
+type EmbeddingRequest struct {
+	Input          []string `json:"input"`
+	Model          string   `json:"model"`
+	EncodingFormat string   `json:"encoding_format,omitempty"`
+	Dimensions     int      `json:"dimensions,omitempty"`
+}
+
+// EmbeddingData represents a single embedding in the response
+type EmbeddingData struct {
+	Object    string    `json:"object"`
+	Embedding []float32 `json:"embedding"`
+	Index     int       `json:"index"`
+}
+
+// EmbeddingResponse represents the response from OpenAI embeddings API
+type EmbeddingResponse struct {
+	Object string          `json:"object"`
+	Data   []EmbeddingData `json:"data"`
+	Model  string          `json:"model"`
+	Usage  EmbeddingUsage  `json:"usage"`
+}
+
+// EmbeddingUsage represents token usage for embeddings
+type EmbeddingUsage struct {
+	PromptTokens int `json:"prompt_tokens"`
+	TotalTokens  int `json:"total_tokens"`
+}
+
+// GenerateEmbedding generates an embedding for a single text
+func (c *OpenAIClient) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
+	embeddings, err := c.GenerateEmbeddings(ctx, []string{text})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(embeddings) == 0 {
+		return nil, fmt.Errorf("no embeddings returned")
+	}
+
+	return embeddings[0], nil
+}
+
+// GenerateEmbeddings generates embeddings for multiple texts
+func (c *OpenAIClient) GenerateEmbeddings(ctx context.Context, texts []string) ([][]float32, error) {
+	url := openaiBaseURL + "/embeddings"
+
+	request := EmbeddingRequest{
+		Input:          texts,
+		Model:          "text-embedding-3-small",
+		EncodingFormat: "float",
+		Dimensions:     EmbeddingVectorDimensions,
+	}
+
+	bodyBytes, err := c.retryableRequest(ctx, url, request, "embeddings")
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse the successful response
+	var embeddingResp EmbeddingResponse
+	if err := json.Unmarshal(bodyBytes, &embeddingResp); err != nil {
+		return nil, fmt.Errorf("failed to parse embeddings response: %w", err)
+	}
+
+	// Extract embeddings in order
+	embeddings := make([][]float32, len(texts))
+	for _, data := range embeddingResp.Data {
+		if data.Index >= 0 && data.Index < len(embeddings) {
+			embeddings[data.Index] = data.Embedding
+		}
+	}
+
+	return embeddings, nil
+}
+
+func saveResponseToFile(model string, req groq.ChatCompletionRequest, bodyBytes []byte, statusCode int) {
 	// Create a unique filename with timestamp
 	timestamp := time.Now().Format("20060102_150405")
 	random := uuid.New().String()[:8]
-	filename := fmt.Sprintf("groq_req_%s_%s.json", timestamp, random)
+	filename := fmt.Sprintf("openai_req_%s_%s.json", timestamp, random)
 
 	// Create model-specific directory
 	modelDir := fmt.Sprintf("llm_requests/%s", model)
@@ -262,9 +323,9 @@ func saveResponseToFile(model string, req ChatCompletionRequest, bodyBytes []byt
 	}
 }
 
-// ChatCompletionStream sends a streaming chat completion request to Groq
-func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletionRequest, callback func(token string)) (*StreamingResult, error) {
-	url := groqBaseURL + "/chat/completions"
+// ChatCompletionStream sends a streaming chat completion request to OpenAI
+func (c *OpenAIClient) ChatCompletionStream(ctx context.Context, req groq.ChatCompletionRequest, callback func(token string)) (*groq.StreamingResult, error) {
+	url := openaiBaseURL + "/chat/completions"
 
 	// Ensure stream is enabled
 	req.Stream = true
@@ -273,10 +334,8 @@ func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletio
 	opts := retry.Options{
 		Config:       c.RetryConfig,
 		ErrorChecker: c.isRetryableError,
-		APIName:      "Groq",
-	}
-	if c.verboseLog {
-		opts.Logger = log.Printf
+		Logger:       log.Printf,
+		APIName:      "OpenAI",
 	}
 
 	var requestStartTime time.Time
@@ -310,8 +369,8 @@ func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletio
 		// If we get here and status is not OK, it's an error
 		if resp.StatusCode != http.StatusOK {
 			bodyBytes, _ := io.ReadAll(resp.Body)
-			return nil, resp.StatusCode, bodyBytes, &ChatCompletionError{
-				Message:    fmt.Sprintf("groq API error %d", resp.StatusCode),
+			return nil, resp.StatusCode, bodyBytes, &groq.ChatCompletionError{
+				Message:    fmt.Sprintf("openai API error %d", resp.StatusCode),
 				StatusCode: resp.StatusCode,
 				RawBody:    json.RawMessage(bodyBytes),
 			}
@@ -338,10 +397,10 @@ func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletio
 			return nil, resp.StatusCode, nil, fmt.Errorf("failed to parse streaming response: %w", err)
 		}
 
-		// Check if we should dump the request/response for streaming
-		if os.Getenv("DEBUG_LLM_REQUESTS") == "true" {
+		// Check if we should dump the request/response for streaming (chat API only)
+		if os.Getenv("DUMP_LLM_REQUESTS") == "true" {
 			responseJSON, _ := json.Marshal(response)
-			saveResponseToFile(req.Model, req, responseJSON, resp.StatusCode)
+			saveResponseToFile(req.Model, req, responseJSON, 200) // Use 200 for successful streaming
 		}
 
 		// Calculate TTFT if we captured first token time
@@ -352,7 +411,7 @@ func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletio
 		}
 
 		// Create streaming result with metadata
-		result := &StreamingResult{
+		result := &groq.StreamingResult{
 			Response:         response,
 			TimeToFirstToken: ttftMs,
 		}
@@ -366,17 +425,17 @@ func (c *GroqClient) ChatCompletionStream(ctx context.Context, req ChatCompletio
 		return nil, err
 	}
 
-	return result.(*StreamingResult), nil
+	return result.(*groq.StreamingResult), nil
 }
 
-// parseStreamingResponse parses Server-Sent Events from the response body
-func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader, callback func(token string)) (*ChatCompletionResponse, error) {
+// parseStreamingResponse parses Server-Sent Events from the OpenAI API response body
+func (c *OpenAIClient) parseStreamingResponse(ctx context.Context, body io.Reader, callback func(token string)) (*groq.ChatCompletionResponse, error) {
 	scanner := bufio.NewScanner(body)
-	var finalResponse *ChatCompletionResponse
+	var finalResponse *groq.ChatCompletionResponse
 	var fullContent strings.Builder
 
 	// Track tool calls being built from deltas
-	toolCallsMap := make(map[int]*ToolCallRequest) // Map by index to accumulate tool calls
+	toolCallsMap := make(map[int]*groq.ToolCallRequest) // Map by index to accumulate tool calls
 
 	for scanner.Scan() {
 		// Check for context cancellation
@@ -403,7 +462,7 @@ func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader,
 			}
 
 			// Parse JSON chunk
-			var chunk ChatCompletionStreamResponse
+			var chunk groq.ChatCompletionStreamResponse
 			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
 				// Skip malformed chunks but continue processing
 				continue
@@ -427,9 +486,9 @@ func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader,
 
 						// Initialize tool call if this is the first delta for this index
 						if toolCallsMap[index] == nil {
-							toolCallsMap[index] = &ToolCallRequest{
+							toolCallsMap[index] = &groq.ToolCallRequest{
 								Type: "function",
-								Function: ToolCallFunction{
+								Function: groq.ToolCallFunction{
 									Arguments: "",
 								},
 							}
@@ -461,14 +520,14 @@ func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader,
 
 				// Build final response from first chunk or update existing
 				if finalResponse == nil {
-					finalResponse = &ChatCompletionResponse{
+					finalResponse = &groq.ChatCompletionResponse{
 						ID:     chunk.ID,
 						Object: chunk.Object,
-						Choices: []ChatCompletionChoice{
+						Choices: []groq.ChatCompletionChoice{
 							{
 								Index: choice.Index,
-								Message: ChatMessage{
-									Role:    MessageRoleAssistant,
+								Message: groq.ChatMessage{
+									Role:    groq.MessageRoleAssistant,
 									Content: &[]string{""}[0], // Will be updated with full content
 								},
 								FinishReason: "",
@@ -504,7 +563,7 @@ func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader,
 
 	// Assemble complete tool calls from accumulated deltas
 	if len(toolCallsMap) > 0 {
-		toolCalls := make([]ToolCallRequest, 0, len(toolCallsMap))
+		toolCalls := make([]groq.ToolCallRequest, 0, len(toolCallsMap))
 
 		// Convert map to ordered slice (by index)
 		for i := 0; i < len(toolCallsMap); i++ {
@@ -519,13 +578,4 @@ func (c *GroqClient) parseStreamingResponse(ctx context.Context, body io.Reader,
 	}
 
 	return finalResponse, nil
-}
-
-// pushToRetryChan pushes the attempt to the retry channel
-func (c *GroqClient) pushToRetryChan(attempt int) {
-	select {
-	case c.RetryChan <- attempt:
-	default:
-		// Channel full or no receiver, continue without blocking
-	}
 }
