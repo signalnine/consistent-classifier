@@ -12,20 +12,28 @@ import (
 )
 
 var (
+	// client is the singleton Pinecone client
+	client *pinecone.Client
+	once   sync.Once
+
+	// baseIndexInstance is the singleton index instance for the base index
 	baseIndexInstance *indexOperations
 	baseSetup         sync.Once
 )
 
 // NewPineconeService creates a new Pinecone service instance using the official SDK
 func NewPineconeService() *pineconeService {
-	apiKey := os.Getenv("PINECONE_API_KEY")
+	once.Do(func() {
+		apiKey := os.Getenv("PINECONE_API_KEY")
 
-	client, err := pinecone.NewClient(pinecone.NewClientParams{
-		ApiKey: apiKey,
+		pcClient, err := pinecone.NewClient(pinecone.NewClientParams{
+			ApiKey: apiKey,
+		})
+		if err != nil {
+			panic("Failed to initialize Pinecone client: " + err.Error())
+		}
+		client = pcClient
 	})
-	if err != nil {
-		panic("Failed to initialize Pinecone client: " + err.Error())
-	}
 
 	return &pineconeService{
 		client: client,

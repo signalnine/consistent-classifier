@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
 	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
 )
@@ -35,10 +36,12 @@ type LabelVectorHit struct {
 	Root string
 }
 
-// Vectorize will classify texts using BoW vector clustering.
+// Vectorize will classify texts using Bag of Words (BoW) vector clustering.
 func Vectorize() {
 	// Prepare
 	voyageClient := voyage.NewEmbeddingService()
+	pineconeClient := pinecone.NewPineconeService()
+	vectorIndex := pineconeClient.ForBaseIndex()
 	DSU := disjoint_set.NewDSU(0)
 	dataset := []DatasetItem{}
 	results := make([]Result, 0)
