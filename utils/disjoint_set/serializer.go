@@ -26,8 +26,8 @@ func (d *dsu) ReadFromFile(filename string) (*dsu, error) {
 	return d, nil
 }
 
-// WriteToFile writes the DSU to a file.
-func (d *dsu) WriteToFile(filename string) error {
+// writeToFile writes the DSU to a file.
+func (d *dsu) writeToFile(filename string) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

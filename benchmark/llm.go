@@ -7,3 +7,7 @@ func LLM() {
 		// It will also create a llm_overview.csv file with high-level stats of what we did.
 	*/
 }
+
+func classifyTextWithLLM(text string) string {
+	return ""
+}

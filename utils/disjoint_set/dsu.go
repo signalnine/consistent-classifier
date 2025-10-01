@@ -1,6 +1,9 @@
 package disjoint_set
 
-import "sync"
+import (
+	"os"
+	"sync"
+)
 
 type dsu struct {
 	root   []int
@@ -38,6 +41,7 @@ func (d *dsu) Find(x int) int {
 	if d.root[x] == x {
 		return x
 	}
+
 	d.root[x] = d.Find(d.root[x]) // Path compression
 	return d.root[x]
 }
@@ -53,6 +57,15 @@ func (d *dsu) FindByLabel(label string) int {
 	}
 
 	return d.Find(idx)
+}
+
+// FindOrCreate finds the root of the set by label, or adds it if it doesn't exist
+func (d *dsu) FindOrCreate(label string) int {
+	idx := d.FindByLabel(label)
+	if idx == -1 {
+		idx = d.Add(label)
+	}
+	return idx
 }
 
 // Union merges two sets
@@ -99,4 +112,9 @@ func (d *dsu) Labels() []string {
 		labels = append(labels, label)
 	}
 	return labels
+}
+
+// Save saves the DSU to a file
+func (d *dsu) Save() error {
+	return d.writeToFile(os.Getenv("DSU_FILEPATH"))
 }

@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -16,7 +17,7 @@ type DatasetItem struct {
 
 type Result struct {
 	Content string
-	Class   string
+	Label   string
 }
 
 type VectorHit struct {
@@ -27,6 +28,11 @@ type VectorHit struct {
 type ContentVectorHit struct {
 	*VectorHit
 	Label string
+}
+
+type LabelVectorHit struct {
+	*VectorHit
+	Root string
 }
 
 // Vectorize will classify texts using BoW vector clustering.
@@ -55,28 +61,38 @@ func Vectorize() {
 	// Classify the tweet
 	for i, text := range dataset {
 		hit := searchPineconeForContent(embeddings[i].Embedding)
-		if hit == nil {
-			class := classifyTextWithLLM(text.UserResponse)
+		if hit != nil {
 			results = append(results, Result{
 				Content: text.UserResponse,
-				Class:   class,
+				Label:   hit.Label,
 			})
 			continue
 		}
 
+		class := classifyTextWithLLM(text.UserResponse)
 		results = append(results, Result{
 			Content: text.UserResponse,
-			Class:   hit.Label,
+			Label:   class,
 		})
 	}
 
 	// Find the root of the label & persist vector data
 	for _, result := range results {
-		// 1- Look for similar label that have a root in Pinecone
-		// 2- If none, establish as a new root. Save it in DSU
+		fmt.Println(result)
+		similarLabel := searchPineconeForLabel(result.Label)
+		rootLabel := result.Label
+		if similarLabel != nil {
+			rootLabel = similarLabel.Root
+		}
+
+		DSU.Union(DSU.FindOrCreate(rootLabel), DSU.FindOrCreate(result.Label))
+		err := DSU.Save()
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		// 3- Upsert the [content]:[label] into Pinecone
 		// 4- Upsert the [label]:[root] into Pinecone
-		// 5- Update the DSU
 	}
 
 	/*
@@ -99,10 +115,6 @@ func searchPineconeForContent(vectors []float32) *ContentVectorHit {
 	return &ContentVectorHit{}
 }
 
-func searchPineconeForLabel(label string) *ContentVectorHit {
-	return &ContentVectorHit{}
-}
-
-func searchPineconeForLabel(label string) {
-
+func searchPineconeForLabel(label string) *LabelVectorHit {
+	return &LabelVectorHit{}
 }
