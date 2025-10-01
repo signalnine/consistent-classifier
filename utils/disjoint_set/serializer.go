@@ -2,6 +2,7 @@ package disjoint_set
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -12,11 +13,13 @@ func (d *dsu) ReadFromFile(filename string) (*dsu, error) {
 
 	data, err := os.ReadFile(filename)
 	if err != nil {
+		fmt.Println("Error reading DSU from file:", err)
 		return nil, err
 	}
 
 	err = d.UnmarshalJSON(data)
 	if err != nil {
+		fmt.Println("Error unmarshalling DSU from file:", err)
 		return nil, err
 	}
 
@@ -30,9 +33,17 @@ func (d *dsu) WriteToFile(filename string) error {
 
 	data, err := d.MarshalJSON()
 	if err != nil {
+		fmt.Println("Error marshalling DSU to file:", err)
 		return err
 	}
-	return os.WriteFile(filename, data, 0644)
+
+	err = os.WriteFile(filename, data, 0644)
+	if err != nil {
+		fmt.Println("Error writing DSU to file:", err)
+		return err
+	}
+
+	return nil
 }
 
 // MarshalJSON implements json.Marshaler interface
