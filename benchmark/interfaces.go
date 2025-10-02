@@ -1,0 +1,23 @@
+package benchmark
+
+import (
+	"context"
+
+	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
+	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
+	"github.com/austinfhunter/voyageai"
+)
+
+// IndexOperationsInterface defines the interface for Pinecone index operations
+type IndexOperationsInterface interface {
+	Search(ctx context.Context, queryVector []float32, topK int, filter map[string]any, includeMetadata bool) ([]pinecone.QueryMatch, error)
+	Upsert(ctx context.Context, vectors []pinecone.Vector) error
+	Delete(ctx context.Context, ids []string) error
+	FindById(ctx context.Context, id string) (*pinecone.Vector, error)
+	UpdateMetadata(ctx context.Context, vectorID string, metadata *pinecone.Metadata) error
+}
+
+type EmbeddingInterface interface {
+	GenerateEmbedding(ctx context.Context, text string, embeddingType voyage.VoyageEmbeddingType) ([]float32, error)
+	GenerateEmbeddings(ctx context.Context, texts []string, embeddingType voyage.VoyageEmbeddingType) ([]voyageai.EmbeddingObject, error)
+}
