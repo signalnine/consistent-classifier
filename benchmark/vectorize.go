@@ -62,7 +62,7 @@ func Vectorize() {
 			continue
 		}
 
-		label, tokenUsage, err := classifyTextWithLLM(tweet.UserResponse)
+		label, tokenUsage, err := classifyTextWithLLM(tweet.Content, tweet.UserResponse)
 		if err != nil {
 			log.Fatal(err)
 		}

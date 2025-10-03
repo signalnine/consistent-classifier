@@ -15,9 +15,14 @@ type ChatCompletionResponse struct {
 }
 
 type ChatCompletionUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens        int                 `json:"prompt_tokens"`
+	CompletionTokens    int                 `json:"completion_tokens"`
+	TotalTokens         int                 `json:"total_tokens"`
+	PromptTokensDetails *PromptTokenDetails `json:"prompt_tokens_details,omitempty"`
+}
+
+type PromptTokenDetails struct {
+	CachedTokens int `json:"cached_tokens"`
 }
 
 type ChatError struct {
@@ -33,21 +38,21 @@ type ChatCompletionResponseError struct {
 
 // Streaming response structures for Server-Sent Events
 type ChatCompletionStreamChoice struct {
-	Index        int                      `json:"index"`
-	Delta        ChatCompletionDelta      `json:"delta"`
-	FinishReason *string                  `json:"finish_reason"`
+	Index        int                 `json:"index"`
+	Delta        ChatCompletionDelta `json:"delta"`
+	FinishReason *string             `json:"finish_reason"`
 }
 
 type ChatCompletionDelta struct {
-	Role      *string        `json:"role,omitempty"`
-	Content   *string        `json:"content,omitempty"`
+	Role      *string           `json:"role,omitempty"`
+	Content   *string           `json:"content,omitempty"`
 	ToolCalls *[]ToolCallStream `json:"tool_calls,omitempty"`
 }
 
 type ToolCallStream struct {
-	Index    int                    `json:"index"`
-	ID       *string               `json:"id,omitempty"`
-	Type     *string               `json:"type,omitempty"`
+	Index    int                     `json:"index"`
+	ID       *string                 `json:"id,omitempty"`
+	Type     *string                 `json:"type,omitempty"`
 	Function *ToolCallFunctionStream `json:"function,omitempty"`
 }
 

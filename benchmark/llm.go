@@ -1,8 +1,15 @@
 package benchmark
 
 import (
+	"context"
+	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/FrenchMajesty/consistent-classifier/clients/groq"
+	"github.com/FrenchMajesty/consistent-classifier/clients/openai"
 )
 
 func LLM() {
@@ -20,7 +27,7 @@ func LLM() {
 
 	for _, tweet := range dataset {
 		tweetStartTime := time.Now()
-		label, tokenUsage, err := classifyTextWithLLM(tweet.UserResponse)
+		label, tokenUsage, err := classifyTextWithLLM(tweet.Content, tweet.UserResponse)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -44,6 +51,58 @@ func LLM() {
 	}
 }
 
-func classifyTextWithLLM(text string) (string, TokenUsageMetrics, error) {
-	return "", TokenUsageMetrics{}, nil
+func classifyTextWithLLM(post, reply string) (string, TokenUsageMetrics, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return "", TokenUsageMetrics{}, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+	}
+
+	client := openai.NewOpenAIClient(apiKey, "dev")
+
+	systemPrompt := `You are a text classification assistant. Given a user's response/reply, classify it into a concise category label.
+
+Rules:
+- Return ONLY the category label, nothing else
+- Use lowercase with underscores (e.g., "technical_question", "expressing_gratitude")
+- Keep labels short and descriptive (2-5 words max)
+- Be consistent: similar responses should get the same label`
+
+	userPrompt := fmt.Sprintf("Original Post: %s\n\n\nUser Response: \"%s\"", post, reply)
+
+	req := groq.ChatCompletionRequest{
+		Model: "gpt-4.1-mini",
+		Messages: []groq.ChatMessage{
+			{
+				Role:    groq.MessageRoleSystem,
+				Content: &systemPrompt,
+			},
+			{
+				Role:    groq.MessageRoleUser,
+				Content: &userPrompt,
+			},
+		},
+		Temperature:         0.3,
+		MaxCompletionTokens: 50,
+	}
+
+	ctx := context.Background()
+	resp, err := client.ChatCompletion(ctx, req)
+	if err != nil {
+		return "", TokenUsageMetrics{}, fmt.Errorf("failed to get LLM response: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
+		return "", TokenUsageMetrics{}, fmt.Errorf("no response from LLM")
+	}
+
+	label := strings.TrimSpace(*resp.Choices[0].Message.Content)
+	label = strings.ToLower(label)
+
+	tokenUsage := TokenUsageMetrics{
+		InputTokens:       resp.Usage.PromptTokens,
+		CachedInputTokens: resp.Usage.PromptTokensDetails.CachedTokens,
+		OutputTokens:      resp.Usage.CompletionTokens,
+	}
+
+	return label, tokenUsage, nil
 }
