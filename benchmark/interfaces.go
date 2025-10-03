@@ -42,3 +42,29 @@ type TokenUsageMetrics struct {
 	CachedInputTokens int
 	OutputTokens      int
 }
+
+type DatasetItem struct {
+	Content      string
+	UserResponse string
+	UserCategory string
+}
+
+type Result struct {
+	Tweet string
+	Label string
+}
+
+type VectorHit struct {
+	Score      float32
+	VectorText string
+}
+
+type ContentVectorHit struct {
+	*VectorHit
+	Label string
+}
+
+type LabelVectorHit struct {
+	*VectorHit
+	Root string
+}

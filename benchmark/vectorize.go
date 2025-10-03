@@ -15,31 +15,6 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type DatasetItem struct {
-	UserResponse string
-	UserCategory string
-}
-
-type Result struct {
-	Tweet string
-	Label string
-}
-
-type VectorHit struct {
-	Score      float32
-	VectorText string
-}
-
-type ContentVectorHit struct {
-	*VectorHit
-	Label string
-}
-
-type LabelVectorHit struct {
-	*VectorHit
-	Root string
-}
-
 // Vectorize will classify texts using Bag of Words (BoW) vector clustering.
 func Vectorize() {
 	// Prepare
