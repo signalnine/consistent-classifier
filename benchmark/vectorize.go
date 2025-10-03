@@ -47,7 +47,12 @@ func Vectorize() {
 	pineconeClient := pinecone.NewPineconeService()
 	vectorIndex := pineconeClient.ForBaseIndex()
 	DSU := disjoint_set.NewDSU()
-	dataset := []DatasetItem{}
+
+	dataset, err := loadDataset()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	results := make([]Result, 0)
 	startTime := time.Now()
 	benchmarkMetrics := BenchmarkMetrics{
