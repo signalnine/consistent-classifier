@@ -10,6 +10,7 @@ import (
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
 	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/austinfhunter/voyageai"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -52,18 +53,7 @@ func Vectorize() {
 	filepath := os.Getenv("DSU_FILEPATH")
 	DSU.ReadFromFile(filepath)
 
-	// Generate embeddings for the entire dataset
-	tweets := []string{}
-	for _, tweet := range dataset {
-		tweets = append(tweets, tweet.UserResponse)
-	}
-
-	queryEmbeddings, err := voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeQuery)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	storageEmbeddings, err := voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeDocument)
+	queryEmbeddings, storageEmbeddings, err := embedDataset(voyageClient, dataset)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -120,6 +110,48 @@ func Vectorize() {
 
 		wg.Wait()
 	}
+}
+
+// Embed the dataset both as a query and document
+func embedDataset(voyageClient EmbeddingInterface, dataset []DatasetItem) ([]voyageai.EmbeddingObject, []voyageai.EmbeddingObject, error) {
+	// Generate embeddings for the entire dataset
+	tweets := []string{}
+	for _, tweet := range dataset {
+		tweets = append(tweets, tweet.UserResponse)
+	}
+
+	queryEmbeddings := []voyageai.EmbeddingObject{}
+	storageEmbeddings := []voyageai.EmbeddingObject{}
+	var err error
+	var finalErr error
+
+	// Parallelize the embedding generation
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		queryEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeQuery)
+		if err != nil {
+			finalErr = err
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		storageEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeDocument)
+		if err != nil {
+			finalErr = err
+		}
+	}()
+
+	wg.Wait()
+
+	if finalErr != nil {
+		return nil, nil, finalErr
+	}
+
+	return queryEmbeddings, storageEmbeddings, nil
 }
 
 // Search for a tweet vector in Pinecone
