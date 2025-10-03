@@ -8,6 +8,6 @@ func LLM() {
 	*/
 }
 
-func classifyTextWithLLM(text string) string {
-	return ""
+func classifyTextWithLLM(text string) (string, TokenUsageMetrics, error) {
+	return "", TokenUsageMetrics{}, nil
 }

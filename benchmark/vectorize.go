@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
@@ -45,9 +46,13 @@ func Vectorize() {
 	voyageClient := voyage.NewEmbeddingService()
 	pineconeClient := pinecone.NewPineconeService()
 	vectorIndex := pineconeClient.ForBaseIndex()
-	DSU := disjoint_set.NewDSU(0)
+	DSU := disjoint_set.NewDSU()
 	dataset := []DatasetItem{}
 	results := make([]Result, 0)
+	startTime := time.Now()
+	benchmarkMetrics := BenchmarkMetrics{
+		TotalTweets: len(dataset),
+	}
 
 	// Read the DSU from file
 	filepath := os.Getenv("DSU_FILEPATH")
@@ -60,27 +65,43 @@ func Vectorize() {
 
 	// Classify the tweet
 	for i, tweet := range dataset {
+		tweetStartTime := time.Now()
 		hit := searchPineconeForTweet(queryEmbeddings[i].Embedding)
+		benchmarkMetrics.VectorReads++
 		if hit != nil {
 			results = append(results, Result{
 				Tweet: tweet.UserResponse,
 				Label: hit.Label,
 			})
+			benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, TokenUsageMetrics{
+				InputTokens:       0,
+				CachedInputTokens: 0,
+				OutputTokens:      0,
+			})
+			benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
 			continue
 		}
 
-		class := classifyTextWithLLM(tweet.UserResponse)
+		label, tokenUsage, err := classifyTextWithLLM(tweet.UserResponse)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
+		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, tokenUsage)
 		results = append(results, Result{
 			Tweet: tweet.UserResponse,
-			Label: class,
+			Label: label,
 		})
 	}
 
+	var wg sync.WaitGroup
 	// Find the root of the label & persist vector data
 	for i, result := range results {
 		// Find the root of the label
-		similarLabel := searchPineconeForLabel(voyageClient, result.Label)
 		rootLabel := result.Label
+		similarLabel := searchPineconeForLabel(voyageClient, result.Label)
+		benchmarkMetrics.VectorReads++
 		if similarLabel != nil {
 			rootLabel = similarLabel.Root
 		}
@@ -92,13 +113,13 @@ func Vectorize() {
 			log.Fatal(err)
 		}
 
-		var wg sync.WaitGroup
 		wg.Add(2)
 		// Create lookup vector ref by tweet to shorcut classification
 		go func() {
 			defer wg.Done()
 			id := fmt.Sprintf("content:%d", i)
 			upsertTweetToVector(vectorIndex, id, result.Tweet, storageEmbeddings[i].Embedding, result.Label)
+			benchmarkMetrics.VectorWrites++
 		}()
 
 		// Create lookup vector ref by label to find root
@@ -106,9 +127,19 @@ func Vectorize() {
 			defer wg.Done()
 			id := fmt.Sprintf("label:%d", i)
 			upsertLabelToVector(vectorIndex, voyageClient, id, result.Label, rootLabel)
+			benchmarkMetrics.VectorWrites++
 		}()
 
 		wg.Wait()
+	}
+
+	benchmarkMetrics.TotalDuration = time.Since(startTime)
+	benchmarkMetrics.UniqueLabels = DSU.Size()
+	benchmarkMetrics.ConvergedLabels = DSU.CountSets()
+
+	err = saveMetricsToFile(benchmarkMetrics)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 

@@ -2,6 +2,7 @@ package benchmark
 
 import (
 	"context"
+	"time"
 
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
@@ -20,4 +21,24 @@ type IndexOperationsInterface interface {
 type EmbeddingInterface interface {
 	GenerateEmbedding(ctx context.Context, text string, embeddingType voyage.VoyageEmbeddingType) ([]float32, error)
 	GenerateEmbeddings(ctx context.Context, texts []string, embeddingType voyage.VoyageEmbeddingType) ([]voyageai.EmbeddingObject, error)
+}
+
+type BenchmarkMetrics struct {
+	// Overall metrics
+	TotalDuration   time.Duration
+	TotalTweets     int
+	UniqueLabels    int
+	ConvergedLabels int
+	VectorReads     int
+	VectorWrites    int
+
+	// Per-tweet metrics
+	ProcessingTime []time.Duration
+	TokenUsage     []TokenUsageMetrics
+}
+
+type TokenUsageMetrics struct {
+	InputTokens       int
+	CachedInputTokens int
+	OutputTokens      int
 }

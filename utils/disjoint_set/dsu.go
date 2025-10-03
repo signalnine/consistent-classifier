@@ -13,10 +13,10 @@ type dsu struct {
 }
 
 // NewDSU creates a new DSU with the given size.
-func NewDSU(size int) *dsu {
+func NewDSU() *dsu {
 	return &dsu{
-		root:   make([]int, size),
-		rank:   make([]int, size),
+		root:   make([]int, 0),
+		rank:   make([]int, 0),
 		labels: make(map[string]int),
 		lock:   sync.RWMutex{},
 	}
@@ -99,7 +99,7 @@ func (d *dsu) Size() int {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
-	return len(d.root)
+	return len(d.labels)
 }
 
 // Labels returns all labels in the DSU
@@ -112,6 +112,21 @@ func (d *dsu) Labels() []string {
 		labels = append(labels, label)
 	}
 	return labels
+}
+
+// CountSets returns the number of unique sets in the DSU
+func (d *dsu) CountSets() int {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
+	rootSet := make(map[int]bool)
+	for _, root := range d.root {
+		if root == d.Find(root) {
+			rootSet[root] = true
+		}
+	}
+
+	return len(rootSet)
 }
 
 // Save saves the DSU to a file
