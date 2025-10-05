@@ -15,12 +15,15 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+const MIN_SIMILARITY_SCORE = 0.5
+
 // Vectorize will classify texts using Bag of Words (BoW) vector clustering.
 func Vectorize() {
 	// Prepare
 	voyageClient := voyage.NewEmbeddingService()
 	pineconeClient := pinecone.NewPineconeService()
-	vectorIndex := pineconeClient.ForBaseIndex()
+	vectorLabelIndex := pineconeClient.ForBaseIndex("label")
+	vectorContentIndex := pineconeClient.ForBaseIndex("content")
 	DSU := disjoint_set.NewDSU()
 
 	dataset, err := loadDataset()
@@ -80,7 +83,7 @@ func Vectorize() {
 	for i, result := range results {
 		// Find the root of the label
 		rootLabel := result.Label
-		similarLabel := searchPineconeForLabel(voyageClient, result.Label)
+		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, result.Label)
 		benchmarkMetrics.VectorReads++
 		if similarLabel != nil {
 			rootLabel = similarLabel.Root
@@ -98,7 +101,7 @@ func Vectorize() {
 		go func() {
 			defer wg.Done()
 			id := fmt.Sprintf("content:%d", i)
-			upsertTweetToVector(vectorIndex, id, result.Tweet, storageEmbeddings[i].Embedding, result.Label)
+			upsertTweetToVector(vectorContentIndex, id, result.Tweet, storageEmbeddings[i].Embedding, result.Label)
 			benchmarkMetrics.VectorWrites++
 		}()
 
@@ -106,7 +109,7 @@ func Vectorize() {
 		go func() {
 			defer wg.Done()
 			id := fmt.Sprintf("label:%d", i)
-			upsertLabelToVector(vectorIndex, voyageClient, id, result.Label, rootLabel)
+			upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.Label, rootLabel)
 			benchmarkMetrics.VectorWrites++
 		}()
 
@@ -171,12 +174,29 @@ func searchPineconeForTweet(vectors []float32) *ContentVectorHit {
 }
 
 // Search for a label vector in Pinecone
-func searchPineconeForLabel(voyageClient EmbeddingInterface, label string) *LabelVectorHit {
+func searchPineconeForLabel(voyageClient EmbeddingInterface, vectorIndex IndexOperationsInterface, label string) *LabelVectorHit {
 	embedding, err := voyageClient.GenerateEmbedding(context.Background(), label, voyage.VoyageEmbeddingTypeQuery)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return &LabelVectorHit{}
+
+	matches, err := vectorIndex.Search(context.Background(), embedding, 1, nil, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(matches) == 0 || matches[0].Score <= MIN_SIMILARITY_SCORE {
+		return nil
+	}
+
+	metadata := matches[0].Vector.Metadata.AsMap()
+	return &LabelVectorHit{
+		VectorHit: &VectorHit{
+			Score:      matches[0].Score,
+			VectorText: metadata["vector_text"].(string),
+		},
+		Root: metadata["root"].(string),
+	}
 }
 
 // Upsert a tweet vector to Pinecone
