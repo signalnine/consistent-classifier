@@ -27,54 +27,47 @@ func (d *dsu) Add(label string) int {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
+	return d.add(label)
+}
+
+// add adds a new group to the DSU. Returns the index of the new group. (internal, unlocked, caller must hold lock)
+func (d *dsu) add(label string) int {
 	d.root = append(d.root, len(d.root))
 	d.rank = append(d.rank, 0)
 	d.labels[label] = len(d.root) - 1
 	return d.labels[label]
 }
 
-// Find finds the root of the set
-func (d *dsu) Find(x int) int {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
+// find finds the root of the set (internal, unlocked - caller must hold lock)
+func (d *dsu) find(x int) int {
 	if d.root[x] == x {
 		return x
 	}
 
-	d.root[x] = d.Find(d.root[x]) // Path compression
+	d.root[x] = d.find(d.root[x]) // Path compression
 	return d.root[x]
-}
-
-// FindByLabel finds the root of the set by label
-func (d *dsu) FindByLabel(label string) int {
-	d.lock.RLock()
-	defer d.lock.RUnlock()
-
-	idx, ok := d.labels[label]
-	if !ok {
-		return -1
-	}
-
-	return d.Find(idx)
 }
 
 // FindOrCreate finds the root of the set by label, or adds it if it doesn't exist
 func (d *dsu) FindOrCreate(label string) int {
-	idx := d.FindByLabel(label)
-	if idx == -1 {
-		idx = d.Add(label)
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	idx, ok := d.labels[label]
+	if !ok {
+		return d.add(label)
 	}
-	return idx
+
+	return d.find(idx)
 }
 
 // Union merges two sets
 func (d *dsu) Union(x int, y int) {
-	rootX := d.Find(x)
-	rootY := d.Find(y)
-
 	d.lock.Lock()
 	defer d.lock.Unlock()
+
+	rootX := d.find(x)
+	rootY := d.find(y)
 
 	if rootX == rootY {
 		return
@@ -92,7 +85,10 @@ func (d *dsu) Union(x int, y int) {
 
 // Connected checks if two elements are in the same set
 func (d *dsu) Connected(x int, y int) bool {
-	return d.Find(x) == d.Find(y)
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
+	return d.find(x) == d.find(y)
 }
 
 // Size returns the number of elements in the DSU
@@ -122,7 +118,7 @@ func (d *dsu) CountSets() int {
 
 	rootSet := make(map[int]bool)
 	for _, root := range d.root {
-		if root == d.Find(root) {
+		if root == d.find(root) {
 			rootSet[root] = true
 		}
 	}
