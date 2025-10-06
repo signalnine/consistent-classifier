@@ -12,6 +12,7 @@ import (
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
 	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
 	"github.com/austinfhunter/voyageai"
+	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -90,7 +91,6 @@ func Vectorize(limit int) {
 	}
 
 	for i, result := range results {
-		fmt.Println(i)
 		if i%progressInterval == 0 {
 			fmt.Printf("Finding root of label %d/%d\n", i, limit)
 		}
@@ -115,16 +115,23 @@ func Vectorize(limit int) {
 		// Create lookup vector ref by tweet to shorcut classification
 		go func() {
 			defer wg.Done()
-			id := fmt.Sprintf("content:%d", i)
-			upsertTweetToVector(vectorContentIndex, id, result.Reply, storageEmbeddings[i].Embedding, result.ReplyLabel)
+			uuid := uuid.New().String()
+			err = upsertTweetToVector(vectorContentIndex, uuid, result.Reply, storageEmbeddings[i].Embedding, result.ReplyLabel)
+			if err != nil {
+				fmt.Println(err)
+				log.Fatal(err)
+			}
 			benchmarkMetrics.VectorWrites++
 		}()
 
 		// Create lookup vector ref by label to find root
 		go func() {
 			defer wg.Done()
-			id := fmt.Sprintf("label:%d", i)
-			upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.ReplyLabel, rootLabel)
+			id := fmt.Sprintf("label:%s", result.ReplyLabel)
+			err = upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.ReplyLabel, rootLabel)
+			if err != nil {
+				log.Fatal(err)
+			}
 			benchmarkMetrics.VectorWrites++
 		}()
 
@@ -245,6 +252,7 @@ func upsertTweetToVector(vectorIndex IndexOperationsInterface, id string, tweet 
 	})
 	if err != nil {
 		log.Fatal(err)
+		return err
 	}
 
 	err = vectorIndex.Upsert(context.Background(), []pinecone.Vector{
@@ -256,6 +264,7 @@ func upsertTweetToVector(vectorIndex IndexOperationsInterface, id string, tweet 
 			},
 		},
 	})
+
 	if err != nil {
 		log.Fatal(err)
 		return err

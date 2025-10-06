@@ -42,20 +42,18 @@ func NewPineconeService() *pineconeService {
 
 // ForBaseIndex returns an index gateway for the base index
 func (ps *pineconeService) ForBaseIndex(namespace string) *indexOperations {
-	baseSetup.Do(func() {
-		host := os.Getenv("PINECONE_BASE_HOST")
-		indexConnection, err := ps.client.Index(pinecone.NewIndexConnParams{
-			Host:      host,
-			Namespace: namespace,
-		})
-		if err != nil {
-			panic("Failed to initialize Pinecone client: " + err.Error())
-		}
-
-		baseIndexInstance = &indexOperations{
-			index: indexConnection,
-		}
+	host := os.Getenv("PINECONE_BASE_HOST")
+	indexConnection, err := ps.client.Index(pinecone.NewIndexConnParams{
+		Host:      host,
+		Namespace: namespace,
 	})
+	if err != nil {
+		panic("Failed to initialize Pinecone client: " + err.Error())
+	}
+
+	baseIndexInstance = &indexOperations{
+		index: indexConnection,
+	}
 
 	return baseIndexInstance
 }
