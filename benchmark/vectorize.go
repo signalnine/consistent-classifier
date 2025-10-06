@@ -15,10 +15,10 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const MIN_SIMILARITY_SCORE = 0.5
+const MIN_SIMILARITY_SCORE = 0.85
 
 // Vectorize will classify texts using Bag of Words (BoW) vector clustering.
-func Vectorize() {
+func Vectorize(limit int) {
 	// Prepare
 	voyageClient := voyage.NewEmbeddingService()
 	pineconeClient := pinecone.NewPineconeService()
@@ -26,7 +26,7 @@ func Vectorize() {
 	vectorContentIndex := pineconeClient.ForBaseIndex("content")
 	DSU := disjoint_set.NewDSU()
 
-	dataset, err := loadDataset()
+	dataset, err := loadDataset(limit)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func Vectorize() {
 	// Classify the tweet
 	for i, tweet := range dataset {
 		tweetStartTime := time.Now()
-		hit := searchPineconeForTweet(queryEmbeddings[i].Embedding)
+		hit := searchPineconeForTweet(vectorContentIndex, queryEmbeddings[i].Embedding)
 		benchmarkMetrics.VectorReads++
 		if hit != nil {
 			results = append(results, Result{
@@ -71,7 +71,7 @@ func Vectorize() {
 		}
 
 		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
-		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, tokenUsage)
+		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
 		results = append(results, Result{
 			Tweet: tweet.UserResponse,
 			Label: label,
@@ -169,8 +169,24 @@ func embedDataset(voyageClient EmbeddingInterface, dataset []DatasetItem) ([]voy
 }
 
 // Search for a tweet vector in Pinecone
-func searchPineconeForTweet(vectors []float32) *ContentVectorHit {
-	return &ContentVectorHit{}
+func searchPineconeForTweet(vectorIndex IndexOperationsInterface, vectors []float32) *ContentVectorHit {
+	matches, err := vectorIndex.Search(context.Background(), vectors, 1, nil, true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if len(matches) == 0 || matches[0].Score <= MIN_SIMILARITY_SCORE {
+		return nil
+	}
+
+	metadata := matches[0].Vector.Metadata.AsMap()
+	return &ContentVectorHit{
+		VectorHit: &VectorHit{
+			Score:      matches[0].Score,
+			VectorText: metadata["vector_text"].(string),
+		},
+		Label: metadata["label"].(string),
+	}
 }
 
 // Search for a label vector in Pinecone

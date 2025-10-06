@@ -32,7 +32,7 @@ func saveMetricsToFile(metrics BenchmarkMetrics) error {
 }
 
 // loadDataset loads the dataset from the file
-func loadDataset() ([]DatasetItem, error) {
+func loadDataset(limit int) ([]DatasetItem, error) {
 	filepath := os.Getenv("DATASET_FILEPATH")
 	file, err := os.Open(filepath)
 	if err != nil {
@@ -62,13 +62,16 @@ func loadDataset() ([]DatasetItem, error) {
 		})
 	}
 
-	return trimDataset(dataset), nil
+	return trimDataset(dataset, limit), nil
 }
 
-// trimDataset trims the dataset to 500 items
-func trimDataset(dataset []DatasetItem) []DatasetItem {
-	if len(dataset) > MAX_DATASET_SIZE {
-		return dataset[:MAX_DATASET_SIZE]
+// trimDataset trims the dataset to the specified limit
+func trimDataset(dataset []DatasetItem, limit int) []DatasetItem {
+	if limit <= 0 {
+		limit = MAX_DATASET_SIZE
+	}
+	if len(dataset) > limit {
+		return dataset[:limit]
 	}
 	return dataset
 }

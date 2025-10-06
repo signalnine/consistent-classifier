@@ -12,8 +12,8 @@ import (
 	"github.com/FrenchMajesty/consistent-classifier/clients/openai"
 )
 
-func LLM() {
-	dataset, err := loadDataset()
+func LLM(limit int) {
+	dataset, err := loadDataset(limit)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func LLM() {
 		}
 
 		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
-		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, tokenUsage)
+		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
 		results = append(results, Result{
 			Tweet: tweet.UserResponse,
 			Label: label,
@@ -51,10 +51,10 @@ func LLM() {
 	}
 }
 
-func classifyTextWithLLM(post, reply string) (string, TokenUsageMetrics, error) {
+func classifyTextWithLLM(post, reply string) (string, *TokenUsageMetrics, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
-		return "", TokenUsageMetrics{}, fmt.Errorf("OPENAI_API_KEY environment variable not set")
+		return "", nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
 	}
 
 	client := openai.NewOpenAIClient(apiKey, "dev")
@@ -88,11 +88,11 @@ Rules:
 	ctx := context.Background()
 	resp, err := client.ChatCompletion(ctx, req)
 	if err != nil {
-		return "", TokenUsageMetrics{}, fmt.Errorf("failed to get LLM response: %w", err)
+		return "", nil, fmt.Errorf("failed to get LLM response: %w", err)
 	}
 
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == nil {
-		return "", TokenUsageMetrics{}, fmt.Errorf("no response from LLM")
+		return "", nil, fmt.Errorf("no response from LLM")
 	}
 
 	label := strings.TrimSpace(*resp.Choices[0].Message.Content)
@@ -104,5 +104,5 @@ Rules:
 		OutputTokens:      resp.Usage.CompletionTokens,
 	}
 
-	return label, tokenUsage, nil
+	return label, &tokenUsage, nil
 }
