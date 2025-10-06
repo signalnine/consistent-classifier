@@ -282,8 +282,9 @@ func upsertLabelToVector(vectorIndex IndexOperationsInterface, voyageClient Embe
 		log.Fatal(err)
 	}
 	metadata, err := structpb.NewStruct(map[string]any{
-		"label": label,
-		"root":  root,
+		"vector_text": label,
+		"label":       label,
+		"root":        root,
 	})
 	if err != nil {
 		log.Fatal(err)
