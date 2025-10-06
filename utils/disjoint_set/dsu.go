@@ -1,7 +1,6 @@
 package disjoint_set
 
 import (
-	"fmt"
 	"os"
 	"sync"
 )
