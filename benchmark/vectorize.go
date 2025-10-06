@@ -47,7 +47,16 @@ func Vectorize(limit int) {
 	}
 
 	// Classify the tweet
+	progressInterval := limit / 20
+	if progressInterval == 0 {
+		progressInterval = 5
+	}
+
 	for i, tweet := range dataset {
+		if i%progressInterval == 0 {
+			fmt.Printf("Classifying tweet %d/%d\n", i, limit)
+		}
+
 		tweetStartTime := time.Now()
 		hit := searchPineconeForTweet(vectorContentIndex, queryEmbeddings[i].Embedding)
 		benchmarkMetrics.VectorReads++
@@ -80,9 +89,12 @@ func Vectorize(limit int) {
 		})
 	}
 
-	var wg sync.WaitGroup
-	// Find the root of the label & persist vector data
 	for i, result := range results {
+		fmt.Println(i)
+		if i%progressInterval == 0 {
+			fmt.Printf("Finding root of label %d/%d\n", i, limit)
+		}
+
 		// Find the root of the label
 		rootLabel := result.ReplyLabel
 		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, result.ReplyLabel)
@@ -98,6 +110,7 @@ func Vectorize(limit int) {
 			log.Fatal(err)
 		}
 
+		var wg sync.WaitGroup
 		wg.Add(2)
 		// Create lookup vector ref by tweet to shorcut classification
 		go func() {
@@ -117,6 +130,8 @@ func Vectorize(limit int) {
 
 		wg.Wait()
 	}
+
+	fmt.Println("Computing metrics...")
 
 	benchmarkMetrics.TotalDuration = time.Since(startTime)
 	benchmarkMetrics.UniqueLabels = DSU.Size()

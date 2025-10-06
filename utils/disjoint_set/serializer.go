@@ -8,6 +8,7 @@ import (
 
 // ReadFromFile reads a DSU from a file.
 func (d *dsu) ReadFromFile(filename string) (*dsu, error) {
+	d = NewDSU()
 	d.lock.Lock()
 	defer d.lock.Unlock()
 

@@ -1,6 +1,7 @@
 package disjoint_set
 
 import (
+	"fmt"
 	"os"
 	"sync"
 )
@@ -70,11 +71,12 @@ func (d *dsu) FindOrCreate(label string) int {
 
 // Union merges two sets
 func (d *dsu) Union(x int, y int) {
+	rootX := d.Find(x)
+	rootY := d.Find(y)
+
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	rootX := d.Find(x)
-	rootY := d.Find(y)
 	if rootX == rootY {
 		return
 	}
