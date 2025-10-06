@@ -89,24 +89,19 @@ func Vectorize(limit int) {
 			Reply:      tweet.UserResponse,
 			ReplyLabel: label,
 		})
-	}
-
-	for i, result := range results {
-		if i%progressInterval == 0 {
-			fmt.Printf("Finding root of label %d/%d\n", i, limit)
-		}
 
 		// Find the root of the label
-		rootLabel := result.ReplyLabel
-		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, result.ReplyLabel)
+		rootLabel := label
+		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, label)
 		benchmarkMetrics.VectorReads++
 		if similarLabel != nil {
+			fmt.Printf("Found root for %s: %s\n", label, similarLabel.Root)
 			rootLabel = similarLabel.Root
 			benchmarkMetrics.VectorLabelHits++
 		}
 
 		// Union the label with the root label
-		DSU.Union(DSU.FindOrCreate(rootLabel), DSU.FindOrCreate(result.ReplyLabel))
+		DSU.Union(DSU.FindOrCreate(rootLabel), DSU.FindOrCreate(label))
 		err = DSU.Save()
 		if err != nil {
 			log.Fatal(err)
@@ -114,13 +109,13 @@ func Vectorize(limit int) {
 
 		var wg sync.WaitGroup
 		wg.Add(2)
+
 		// Create lookup vector ref by tweet to shorcut classification
 		go func() {
 			defer wg.Done()
 			uuid := uuid.New().String()
-			err = upsertTweetToVector(vectorContentIndex, uuid, result.Reply, storageEmbeddings[i].Embedding, result.ReplyLabel)
+			err = upsertTweetToVector(vectorContentIndex, uuid, tweet.UserResponse, storageEmbeddings[i].Embedding, label)
 			if err != nil {
-				fmt.Println(err)
 				log.Fatal(err)
 			}
 			benchmarkMetrics.VectorWrites++
@@ -129,8 +124,8 @@ func Vectorize(limit int) {
 		// Create lookup vector ref by label to find root
 		go func() {
 			defer wg.Done()
-			id := fmt.Sprintf("label:%s", result.ReplyLabel)
-			err = upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.ReplyLabel, rootLabel)
+			id := label
+			err = upsertLabelToVector(vectorLabelIndex, voyageClient, id, label, rootLabel)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -176,7 +171,7 @@ func embedDataset(voyageClient EmbeddingInterface, dataset []DatasetItem) ([]voy
 
 	go func() {
 		defer wg.Done()
-		queryEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeQuery)
+		queryEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeDocument)
 		if err != nil {
 			finalErr = err
 		}
@@ -222,7 +217,7 @@ func searchPineconeForTweet(vectorIndex IndexOperationsInterface, vectors []floa
 
 // Search for a label vector in Pinecone
 func searchPineconeForLabel(voyageClient EmbeddingInterface, vectorIndex IndexOperationsInterface, label string) *LabelVectorHit {
-	embedding, err := voyageClient.GenerateEmbedding(context.Background(), label, voyage.VoyageEmbeddingTypeQuery)
+	embedding, err := voyageClient.GenerateEmbedding(context.Background(), label, voyage.VoyageEmbeddingTypeDocument)
 	if err != nil {
 		log.Fatal(err)
 	}
