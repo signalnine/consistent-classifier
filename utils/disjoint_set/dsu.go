@@ -117,10 +117,9 @@ func (d *dsu) CountSets() int {
 	defer d.lock.RUnlock()
 
 	rootSet := make(map[int]bool)
-	for _, root := range d.root {
-		if root == d.find(root) {
-			rootSet[root] = true
-		}
+	for i := range d.root {
+		root := d.find(i)
+		rootSet[root] = true
 	}
 
 	return len(rootSet)
