@@ -53,8 +53,9 @@ func Vectorize(limit int) {
 		benchmarkMetrics.VectorReads++
 		if hit != nil {
 			results = append(results, Result{
-				Tweet: tweet.UserResponse,
-				Label: hit.Label,
+				Post:       tweet.Content,
+				Reply:      tweet.UserResponse,
+				ReplyLabel: hit.Label,
 			})
 			benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, TokenUsageMetrics{
 				InputTokens:       0,
@@ -73,8 +74,9 @@ func Vectorize(limit int) {
 		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
 		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
 		results = append(results, Result{
-			Tweet: tweet.UserResponse,
-			Label: label,
+			Post:       tweet.Content,
+			Reply:      tweet.UserResponse,
+			ReplyLabel: label,
 		})
 	}
 
@@ -82,15 +84,15 @@ func Vectorize(limit int) {
 	// Find the root of the label & persist vector data
 	for i, result := range results {
 		// Find the root of the label
-		rootLabel := result.Label
-		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, result.Label)
+		rootLabel := result.ReplyLabel
+		similarLabel := searchPineconeForLabel(voyageClient, vectorLabelIndex, result.ReplyLabel)
 		benchmarkMetrics.VectorReads++
 		if similarLabel != nil {
 			rootLabel = similarLabel.Root
 		}
 
 		// Union the label with the root label
-		DSU.Union(DSU.FindOrCreate(rootLabel), DSU.FindOrCreate(result.Label))
+		DSU.Union(DSU.FindOrCreate(rootLabel), DSU.FindOrCreate(result.ReplyLabel))
 		err = DSU.Save()
 		if err != nil {
 			log.Fatal(err)
@@ -101,7 +103,7 @@ func Vectorize(limit int) {
 		go func() {
 			defer wg.Done()
 			id := fmt.Sprintf("content:%d", i)
-			upsertTweetToVector(vectorContentIndex, id, result.Tweet, storageEmbeddings[i].Embedding, result.Label)
+			upsertTweetToVector(vectorContentIndex, id, result.Reply, storageEmbeddings[i].Embedding, result.ReplyLabel)
 			benchmarkMetrics.VectorWrites++
 		}()
 
@@ -109,7 +111,7 @@ func Vectorize(limit int) {
 		go func() {
 			defer wg.Done()
 			id := fmt.Sprintf("label:%d", i)
-			upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.Label, rootLabel)
+			upsertLabelToVector(vectorLabelIndex, voyageClient, id, result.ReplyLabel, rootLabel)
 			benchmarkMetrics.VectorWrites++
 		}()
 
@@ -121,6 +123,11 @@ func Vectorize(limit int) {
 	benchmarkMetrics.ConvergedLabels = DSU.CountSets()
 
 	err = saveMetricsToFile(benchmarkMetrics)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = saveResultsToFile(results)
 	if err != nil {
 		log.Fatal(err)
 	}

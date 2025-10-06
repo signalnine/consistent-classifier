@@ -35,8 +35,9 @@ func LLM(limit int) {
 		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
 		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
 		results = append(results, Result{
-			Tweet: tweet.UserResponse,
-			Label: label,
+			Post:       tweet.Content,
+			Reply:      tweet.UserResponse,
+			ReplyLabel: label,
 		})
 		labels[label] = true
 	}
@@ -46,6 +47,11 @@ func LLM(limit int) {
 	benchmarkMetrics.ConvergedLabels = len(labels)
 
 	err = saveMetricsToFile(benchmarkMetrics)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = saveResultsToFile(results)
 	if err != nil {
 		log.Fatal(err)
 	}

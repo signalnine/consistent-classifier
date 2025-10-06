@@ -23,3 +23,8 @@ go.work.sum
 
 # env file
 .env
+
+tweet_replies.csv
+llm_requests/
+metrics_*.json
+results_*.json

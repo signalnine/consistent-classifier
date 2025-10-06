@@ -31,6 +31,24 @@ func saveMetricsToFile(metrics BenchmarkMetrics) error {
 	return nil
 }
 
+func saveResultsToFile(results []Result) error {
+	timestamp := time.Now().Format("20060102_150405")
+	random := uuid.New().String()[:8]
+	filename := fmt.Sprintf("results_%s_%s.json", timestamp, random)
+
+	jsonData, err := json.Marshal(results)
+	if err != nil {
+		return err
+	}
+
+	err = os.WriteFile(filename, jsonData, 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // loadDataset loads the dataset from the file
 func loadDataset(limit int) ([]DatasetItem, error) {
 	filepath := os.Getenv("DATASET_FILEPATH")
@@ -57,6 +75,7 @@ func loadDataset(limit int) ([]DatasetItem, error) {
 			continue // Skip malformed rows
 		}
 		dataset = append(dataset, DatasetItem{
+			Content:      record[0], // content column
 			UserResponse: record[1], // user_response column
 			UserCategory: record[2], // user_category column
 		})

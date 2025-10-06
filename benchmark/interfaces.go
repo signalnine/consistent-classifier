@@ -50,8 +50,9 @@ type DatasetItem struct {
 }
 
 type Result struct {
-	Tweet string
-	Label string
+	Post       string
+	Reply      string
+	ReplyLabel string
 }
 
 type VectorHit struct {
