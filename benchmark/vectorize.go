@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const MIN_SIMILARITY_SCORE = 0.85
+const MIN_SIMILARITY_SCORE = 0.80
 
 // Vectorize will classify texts using Bag of Words (BoW) vector clustering.
 func Vectorize(limit int) {
@@ -62,6 +62,7 @@ func Vectorize(limit int) {
 		hit := searchPineconeForTweet(vectorContentIndex, queryEmbeddings[i].Embedding)
 		benchmarkMetrics.VectorReads++
 		if hit != nil {
+			benchmarkMetrics.VectorReplyHits++
 			results = append(results, Result{
 				Post:       tweet.Content,
 				Reply:      tweet.UserResponse,
@@ -101,6 +102,7 @@ func Vectorize(limit int) {
 		benchmarkMetrics.VectorReads++
 		if similarLabel != nil {
 			rootLabel = similarLabel.Root
+			benchmarkMetrics.VectorLabelHits++
 		}
 
 		// Union the label with the root label

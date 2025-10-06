@@ -29,8 +29,12 @@ type BenchmarkMetrics struct {
 	TotalTweets     int
 	UniqueLabels    int
 	ConvergedLabels int
+
+	// Vector operations metrics
 	VectorReads     int
 	VectorWrites    int
+	VectorReplyHits int
+	VectorLabelHits int
 
 	// Per-tweet metrics
 	ProcessingTime []time.Duration
