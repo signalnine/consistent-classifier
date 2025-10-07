@@ -43,12 +43,10 @@ func NewEmbeddingService() *voyageService {
 // GenerateEmbedding generates an embedding for a single text using VoyageAI
 func (es *voyageService) GenerateEmbedding(ctx context.Context, text string, embeddingType VoyageEmbeddingType) ([]float32, error) {
 	dimensions := es.GetEmbeddingDimensions()
-	inputType := string(embeddingType)
 	embeddings, err := client.Embed(
 		[]string{text},
 		VOYAGEAI_EMBEDDING_MODEL,
 		&voyageai.EmbeddingRequestOpts{
-			InputType:       &inputType,
 			OutputDimension: &dimensions,
 		},
 	)
@@ -63,12 +61,10 @@ func (es *voyageService) GenerateEmbedding(ctx context.Context, text string, emb
 // GenerateEmbeddings generates embeddings for multiple texts using VoyageAI
 func (es *voyageService) GenerateEmbeddings(ctx context.Context, texts []string, embeddingType VoyageEmbeddingType) ([]voyageai.EmbeddingObject, error) {
 	dimensions := es.GetEmbeddingDimensions()
-	inputType := string(embeddingType)
 	embeddings, err := client.Embed(
 		texts,
 		VOYAGEAI_EMBEDDING_MODEL,
 		&voyageai.EmbeddingRequestOpts{
-			InputType:       &inputType,
 			OutputDimension: &dimensions,
 		},
 	)
