@@ -58,37 +58,60 @@ func Vectorize(limit int) {
 			fmt.Printf("Classifying tweet %d/%d\n", i, limit)
 		}
 
-		tweetStartTime := time.Now()
+		// User-facing latency starts here
+		userFacingStart := time.Now()
+
+		// Step 1: Vector search (user waits for this)
 		hit := searchPineconeForTweet(vectorContentIndex, queryEmbeddings[i].Embedding)
 		benchmarkMetrics.VectorReads++
+
 		if hit != nil {
+			// Cache HIT - user gets instant response
+			userFacingLatency := time.Since(userFacingStart)
 			benchmarkMetrics.VectorReplyHits++
+			benchmarkMetrics.UserFacingLatency = append(benchmarkMetrics.UserFacingLatency, userFacingLatency)
+			benchmarkMetrics.BackgroundTime = append(benchmarkMetrics.BackgroundTime, 0) // No background work on cache hit
+			benchmarkMetrics.CacheHit = append(benchmarkMetrics.CacheHit, true)
+
 			results = append(results, Result{
 				Post:       tweet.Content,
 				Reply:      tweet.UserResponse,
 				ReplyLabel: hit.Label,
 			})
+
+			// Backwards compatibility
+			benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, userFacingLatency)
 			benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, TokenUsageMetrics{
 				InputTokens:       0,
 				CachedInputTokens: 0,
 				OutputTokens:      0,
 			})
-			benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
 			continue
 		}
 
+		// Cache MISS - call LLM (user waits for this)
 		label, tokenUsage, err := classifyTextWithLLM(tweet.Content, tweet.UserResponse)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, time.Since(tweetStartTime))
-		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
+		// User-facing latency ends here (they got their classification)
+		userFacingLatency := time.Since(userFacingStart)
+		benchmarkMetrics.UserFacingLatency = append(benchmarkMetrics.UserFacingLatency, userFacingLatency)
+		benchmarkMetrics.CacheHit = append(benchmarkMetrics.CacheHit, false)
+
 		results = append(results, Result{
 			Post:       tweet.Content,
 			Reply:      tweet.UserResponse,
 			ReplyLabel: label,
 		})
+
+		// Backwards compatibility
+		benchmarkMetrics.ProcessingTime = append(benchmarkMetrics.ProcessingTime, userFacingLatency)
+		benchmarkMetrics.TokenUsage = append(benchmarkMetrics.TokenUsage, *tokenUsage)
+
+		// Background processing starts here (happens async in production)
+		backgroundStart := time.Now()
 
 		// Find the root of the label
 		rootLabel := label
@@ -133,6 +156,10 @@ func Vectorize(limit int) {
 		}()
 
 		wg.Wait()
+
+		// Background processing ends here
+		backgroundTime := time.Since(backgroundStart)
+		benchmarkMetrics.BackgroundTime = append(benchmarkMetrics.BackgroundTime, backgroundTime)
 	}
 
 	fmt.Println("Computing metrics...")

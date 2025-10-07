@@ -36,9 +36,14 @@ type BenchmarkMetrics struct {
 	VectorReplyHits int
 	VectorLabelHits int
 
-	// Per-tweet metrics
+	// Per-tweet metrics (old - kept for backwards compatibility)
 	ProcessingTime []time.Duration
 	TokenUsage     []TokenUsageMetrics
+
+	// Production-representative metrics (user-facing latency)
+	UserFacingLatency []time.Duration // Time user waits (vector search + LLM if miss)
+	BackgroundTime    []time.Duration // Time for async work (label clustering + DSU + upserts)
+	CacheHit          []bool          // Whether each request was a cache hit
 }
 
 type TokenUsageMetrics struct {
