@@ -11,7 +11,6 @@ import (
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
 	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
-	"github.com/austinfhunter/voyageai"
 	"github.com/google/uuid"
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -42,11 +41,6 @@ func Vectorize(limit int) {
 	filepath := os.Getenv("DSU_FILEPATH")
 	DSU.ReadFromFile(filepath)
 
-	queryEmbeddings, storageEmbeddings, err := embedDataset(voyageClient, dataset)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// Classify the tweet
 	progressInterval := 5
 	if limit > 100 {
@@ -61,8 +55,14 @@ func Vectorize(limit int) {
 		// User-facing latency starts here
 		userFacingStart := time.Now()
 
-		// Step 1: Vector search (user waits for this)
-		hit := searchPineconeForTweet(vectorContentIndex, queryEmbeddings[i].Embedding)
+		// Step 1: Generate embedding for this tweet
+		tweetEmbedding, err := voyageClient.GenerateEmbedding(context.Background(), tweet.UserResponse, voyage.VoyageEmbeddingTypeDocument)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Step 2: Vector search (user waits for this)
+		hit := searchPineconeForTweet(vectorContentIndex, tweetEmbedding)
 		benchmarkMetrics.VectorReads++
 
 		if hit != nil {
@@ -137,7 +137,7 @@ func Vectorize(limit int) {
 		go func() {
 			defer wg.Done()
 			uuid := uuid.New().String()
-			err = upsertTweetToVector(vectorContentIndex, uuid, tweet.UserResponse, storageEmbeddings[i].Embedding, label)
+			err = upsertTweetToVector(vectorContentIndex, uuid, tweet.UserResponse, tweetEmbedding, label)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -179,47 +179,6 @@ func Vectorize(limit int) {
 	}
 }
 
-// Embed the dataset both as a query and document
-func embedDataset(voyageClient EmbeddingInterface, dataset []DatasetItem) ([]voyageai.EmbeddingObject, []voyageai.EmbeddingObject, error) {
-	// Generate embeddings for the entire dataset
-	tweets := []string{}
-	for _, tweet := range dataset {
-		tweets = append(tweets, tweet.UserResponse)
-	}
-
-	queryEmbeddings := []voyageai.EmbeddingObject{}
-	storageEmbeddings := []voyageai.EmbeddingObject{}
-	var err error
-	var finalErr error
-
-	// Parallelize the embedding generation
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
-		queryEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeDocument)
-		if err != nil {
-			finalErr = err
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		storageEmbeddings, err = voyageClient.GenerateEmbeddings(context.Background(), tweets, voyage.VoyageEmbeddingTypeDocument)
-		if err != nil {
-			finalErr = err
-		}
-	}()
-
-	wg.Wait()
-
-	if finalErr != nil {
-		return nil, nil, finalErr
-	}
-
-	return queryEmbeddings, storageEmbeddings, nil
-}
 
 // Search for a tweet vector in Pinecone
 func searchPineconeForTweet(vectorIndex IndexOperationsInterface, vectors []float32) *ContentVectorHit {
