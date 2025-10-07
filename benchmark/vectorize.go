@@ -48,9 +48,9 @@ func Vectorize(limit int) {
 	}
 
 	// Classify the tweet
-	progressInterval := limit / 20
-	if progressInterval == 0 {
-		progressInterval = 5
+	progressInterval := 5
+	if limit > 100 {
+		progressInterval = 10
 	}
 
 	for i, tweet := range dataset {
