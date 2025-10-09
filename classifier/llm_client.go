@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FrenchMajesty/consistent-classifier/clients/groq"
 	"github.com/FrenchMajesty/consistent-classifier/clients/openai"
 )
 
@@ -24,9 +23,9 @@ Rules:
 - Be consistent: similar texts should get the same label`
 
 // NewDefaultLLMClient creates a new LLM client using OpenAI with API key from environment
-func NewDefaultLLMClient(apiKey string, env string, systemPrompt string) *DefaultLLMClient {
+func NewDefaultLLMClient(apiKey string, systemPrompt string) *DefaultLLMClient {
 	instance := DefaultLLMClient{
-		client:       openai.NewOpenAIClient(apiKey, env),
+		client:       openai.NewClient(apiKey),
 		systemPrompt: defaultSystemPrompt,
 	}
 
@@ -41,15 +40,15 @@ func NewDefaultLLMClient(apiKey string, env string, systemPrompt string) *Defaul
 func (c *DefaultLLMClient) Classify(ctx context.Context, text string) (string, error) {
 	userPrompt := fmt.Sprintf("Text to classify: \"%s\"", text)
 
-	req := groq.ChatCompletionRequest{
+	req := openai.ChatCompletionRequest{
 		Model: "gpt-4o-mini",
-		Messages: []groq.ChatMessage{
+		Messages: []openai.ChatMessage{
 			{
-				Role:    groq.MessageRoleSystem,
+				Role:    openai.MessageRoleSystem,
 				Content: &c.systemPrompt,
 			},
 			{
-				Role:    groq.MessageRoleUser,
+				Role:    openai.MessageRoleUser,
 				Content: &userPrompt,
 			},
 		},

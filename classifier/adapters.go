@@ -2,6 +2,7 @@ package classifier
 
 import (
 	"context"
+	"os"
 
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
 	"github.com/FrenchMajesty/consistent-classifier/clients/voyage"
@@ -16,15 +17,17 @@ type VoyageEmbeddingAdapter struct {
 }
 
 // NewVoyageEmbeddingAdapter creates a new adapter for Voyage AI
-func NewVoyageEmbeddingAdapter() *VoyageEmbeddingAdapter {
+func NewVoyageEmbeddingAdapter(apiKey *string) *VoyageEmbeddingAdapter {
+	loadEnvVar(apiKey, "VOYAGEAI_API_KEY")
+
 	return &VoyageEmbeddingAdapter{
-		client: voyage.NewEmbeddingService(),
+		client: voyage.NewEmbeddingService(*apiKey),
 	}
 }
 
 // GenerateEmbedding implements EmbeddingClient interface
 func (a *VoyageEmbeddingAdapter) GenerateEmbedding(ctx context.Context, text string) ([]float32, error) {
-	return a.client.GenerateEmbedding(ctx, text, voyage.VoyageEmbeddingTypeDocument)
+	return a.client.GenerateEmbedding(ctx, text, voyage.VoyageEmbeddingTypeDefault)
 }
 
 // PineconeVectorAdapter adapts the Pinecone client to the VectorClient interface
@@ -36,9 +39,12 @@ type PineconeVectorAdapter struct {
 }
 
 // NewPineconeVectorAdapter creates a new adapter for Pinecone
-func NewPineconeVectorAdapter(namespace string) *PineconeVectorAdapter {
-	client := pinecone.NewPineconeService()
-	index := client.ForBaseIndex(namespace)
+func NewPineconeVectorAdapter(apiKey *string, host *string, namespace string) *PineconeVectorAdapter {
+	loadEnvVar(apiKey, "PINECONE_API_KEY")
+	loadEnvVar(host, "PINECONE_HOST")
+
+	client := pinecone.NewPineconeService(*apiKey)
+	index := client.ForBaseIndex(*host, namespace)
 	return &PineconeVectorAdapter{
 		index: index,
 	}
@@ -88,4 +94,15 @@ func (a *PineconeVectorAdapter) Upsert(ctx context.Context, id string, vector []
 	}
 
 	return a.index.Upsert(ctx, vectors)
+}
+
+// loadEnvVar loads an environment variable into a pointer if no value is provided
+func loadEnvVar(target *string, envKey string) {
+	if target == nil {
+		envVar := os.Getenv(envKey)
+		if envVar == "" {
+			panic(envKey + " environment variable not set and no " + envKey + " provided")
+		}
+		target = &envVar
+	}
 }

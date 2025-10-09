@@ -58,8 +58,8 @@ func (c *OpenAIClient) isRetryableError(err error, statusCode int, responseBody 
 	return false
 }
 
-// retryableRequest executes an HTTP request with retry logic
-func (c *OpenAIClient) retryableRequest(ctx context.Context, url string, requestBody any, apiName string) ([]byte, error) {
+// createAndRunRetryableRequest executes an HTTP request with retry logic
+func (c *OpenAIClient) createAndRunRetryableRequest(ctx context.Context, url string, requestBody any, apiName string) ([]byte, error) {
 	// Setup retry options
 	opts := retry.Options{
 		Config:       c.RetryConfig,
@@ -69,7 +69,20 @@ func (c *OpenAIClient) retryableRequest(ctx context.Context, url string, request
 	}
 
 	// Define the retryable function
-	retryableFn := func(attempt int) (interface{}, int, []byte, error) {
+	retryableFn := c.buildRetryableFn(ctx, url, requestBody, apiName)
+
+	// Execute with retry logic
+	result, err := retry.Execute(ctx, opts, retryableFn)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.([]byte), nil
+}
+
+// buildRetryableFn builds a retryable function for the given request body
+func (c *OpenAIClient) buildRetryableFn(ctx context.Context, url string, requestBody any, apiName string) retry.RetryableFunc {
+	retryableFn := func(attempt int) (any, int, []byte, error) {
 		body, err := json.Marshal(requestBody)
 		if err != nil {
 			return nil, 0, nil, fmt.Errorf("failed to marshal %s request: %w", apiName, err)
@@ -94,13 +107,10 @@ func (c *OpenAIClient) retryableRequest(ctx context.Context, url string, request
 			return nil, resp.StatusCode, nil, fmt.Errorf("failed to read %s response body: %w", apiName, err)
 		}
 
-		// Check if we should dump the request/response (only for chat completions)
-		if apiName == "chat" {
-			if os.Getenv("DUMP_LLM_REQUESTS") == "true" {
-				if chatReq, ok := requestBody.(ChatCompletionRequest); ok {
-					saveResponseToFile(chatReq.Model, chatReq, bodyBytes, resp.StatusCode)
-				}
-			}
+		// Dump the request/response if enabled for debugging purposes
+		chatReq, ok := requestBody.(ChatCompletionRequest)
+		if c.DumpRequests && ok {
+			saveResponseToFile(chatReq.Model, chatReq, bodyBytes, resp.StatusCode)
 		}
 
 		// If we get here and status is not OK, it's an error
@@ -115,15 +125,10 @@ func (c *OpenAIClient) retryableRequest(ctx context.Context, url string, request
 		return bodyBytes, resp.StatusCode, bodyBytes, nil
 	}
 
-	// Execute with retry logic
-	result, err := retry.Execute(ctx, opts, retryableFn)
-	if err != nil {
-		return nil, err
-	}
-
-	return result.([]byte), nil
+	return retryableFn
 }
 
+// saveResponseToFile saves the request/response to a file for debugging purposes
 func saveResponseToFile(model string, req ChatCompletionRequest, bodyBytes []byte, statusCode int) {
 	// Create a unique filename with timestamp
 	timestamp := time.Now().Format("20060102_150405")
@@ -138,14 +143,14 @@ func saveResponseToFile(model string, req ChatCompletionRequest, bodyBytes []byt
 	}
 
 	// Parse response body as JSON
-	var responseBody interface{}
+	var responseBody any
 	if err := json.Unmarshal(bodyBytes, &responseBody); err != nil {
 		log.Printf("Error parsing response body as JSON: %v", err)
 		return
 	}
 
 	// Create a response object to save
-	responseData := map[string]interface{}{
+	responseData := map[string]any{
 		"request":  req,
 		"response": responseBody,
 		"status":   statusCode,

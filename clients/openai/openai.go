@@ -26,7 +26,7 @@ func NewClient(apiKey string) *OpenAIClient {
 func (c *OpenAIClient) ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error) {
 	url := openaiBaseURL + "/chat/completions"
 
-	bodyBytes, err := c.retryableRequest(ctx, url, req, "chat")
+	bodyBytes, err := c.createAndRunRetryableRequest(ctx, url, req, "chat")
 	if err != nil {
 		return nil, err
 	}

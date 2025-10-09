@@ -3,7 +3,6 @@ package pinecone
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 
 	"github.com/pinecone-io/go-pinecone/pinecone"
@@ -15,17 +14,11 @@ var (
 	// client is the singleton Pinecone client
 	client *pinecone.Client
 	once   sync.Once
-
-	// baseIndexInstance is the singleton index instance for the base index
-	baseIndexInstance *indexOperations
-	baseSetup         sync.Once
 )
 
 // NewPineconeService creates a new Pinecone service instance using the official SDK
-func NewPineconeService() *pineconeService {
+func NewPineconeService(apiKey string) *pineconeService {
 	once.Do(func() {
-		apiKey := os.Getenv("PINECONE_API_KEY")
-
 		pcClient, err := pinecone.NewClient(pinecone.NewClientParams{
 			ApiKey: apiKey,
 		})
@@ -41,8 +34,7 @@ func NewPineconeService() *pineconeService {
 }
 
 // ForBaseIndex returns an index gateway for the base index
-func (ps *pineconeService) ForBaseIndex(namespace string) *indexOperations {
-	host := os.Getenv("PINECONE_BASE_HOST")
+func (ps *pineconeService) ForBaseIndex(host string, namespace string) *indexOperations {
 	indexConnection, err := ps.client.Index(pinecone.NewIndexConnParams{
 		Host:      host,
 		Namespace: namespace,
@@ -51,11 +43,9 @@ func (ps *pineconeService) ForBaseIndex(namespace string) *indexOperations {
 		panic("Failed to initialize Pinecone client: " + err.Error())
 	}
 
-	baseIndexInstance = &indexOperations{
+	return &indexOperations{
 		index: indexConnection,
 	}
-
-	return baseIndexInstance
 }
 
 // FindById finds a vector by its ID

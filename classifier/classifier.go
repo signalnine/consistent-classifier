@@ -86,7 +86,6 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 	if len(matches) > 0 && matches[0].Score >= c.minSimilarity {
 		// Cache HIT - return cached label
 		userFacingLatency := time.Since(userFacingStart)
-
 		label, ok := matches[0].Metadata["label"].(string)
 		if !ok {
 			return nil, fmt.Errorf("cached vector missing label metadata")
@@ -94,8 +93,10 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 
 		c.recordCacheHit()
 
+		rootLabel := c.dsu.FindLabel(c.dsu.FindOrCreate(label))
+
 		return &Result{
-			Label:             label,
+			Label:             rootLabel,
 			CacheHit:          true,
 			Confidence:        matches[0].Score,
 			UserFacingLatency: userFacingLatency,

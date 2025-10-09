@@ -10,10 +10,11 @@ import (
 
 // OpenAIClient is a minimal client for the OpenAI Chat API
 type OpenAIClient struct {
-	APIKey      string
-	Env         string
-	HTTPClient  *http.Client
-	RetryConfig retry.Config
+	APIKey       string
+	Env          string
+	DumpRequests bool
+	HTTPClient   *http.Client
+	RetryConfig  retry.Config
 }
 
 type LanguageModelClient interface {
