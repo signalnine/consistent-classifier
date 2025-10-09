@@ -225,13 +225,9 @@ func (c *Classifier) cacheLabelEmbedding(ctx context.Context, label string) erro
 
 	// Find root label from DSU
 	rootIdx := c.dsu.FindOrCreate(label)
-	labels := c.dsu.Labels()
-	rootLabel := label
-	for _, l := range labels {
-		if c.dsu.FindOrCreate(l) == rootIdx {
-			rootLabel = l
-			break
-		}
+	rootLabel := c.dsu.FindLabel(rootIdx)
+	if rootLabel == "" {
+		rootLabel = label
 	}
 
 	metadata := map[string]any{

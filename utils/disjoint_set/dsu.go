@@ -8,19 +8,21 @@ import (
 type DSU = dsu
 
 type dsu struct {
-	root   []int
-	rank   []int
-	labels map[string]int
-	lock   sync.RWMutex
+	root       []int
+	rank       []int
+	labels     map[string]int
+	labelIndex map[int]string
+	lock       sync.RWMutex
 }
 
 // NewDSU creates a new DSU with the given size.
 func NewDSU() *dsu {
 	return &dsu{
-		root:   make([]int, 0),
-		rank:   make([]int, 0),
-		labels: make(map[string]int),
-		lock:   sync.RWMutex{},
+		root:       make([]int, 0),
+		rank:       make([]int, 0),
+		labels:     make(map[string]int),
+		labelIndex: make(map[int]string),
+		lock:       sync.RWMutex{},
 	}
 }
 
@@ -37,6 +39,7 @@ func (d *dsu) add(label string) int {
 	d.root = append(d.root, len(d.root))
 	d.rank = append(d.rank, 0)
 	d.labels[label] = len(d.root) - 1
+	d.labelIndex[len(d.root)-1] = label
 	return d.labels[label]
 }
 
@@ -125,4 +128,16 @@ func (d *dsu) CountSets() int {
 	}
 
 	return len(rootSet)
+}
+
+// FindLabel finds the label by a root index
+func (d *dsu) FindLabel(idx int) string {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
+	if label, ok := d.labelIndex[idx]; ok {
+		return label
+	}
+
+	return ""
 }

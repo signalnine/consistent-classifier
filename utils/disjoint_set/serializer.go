@@ -2,53 +2,13 @@ package disjoint_set
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
 )
-
-// ReadFromFile reads a DSU from a file.
-func (d *dsu) ReadFromFile(filename string) (*dsu, error) {
-	d = NewDSU()
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		fmt.Println("Error reading DSU from file:", err)
-		return nil, err
-	}
-
-	err = d.UnmarshalJSON(data)
-	if err != nil {
-		fmt.Println("Error unmarshalling DSU from file:", err)
-		return nil, err
-	}
-
-	return d, nil
-}
-
-// writeToFile writes the DSU to a file.
-func (d *dsu) writeToFile(filename string) error {
-	d.lock.Lock()
-	defer d.lock.Unlock()
-
-	data, err := d.MarshalJSON()
-	if err != nil {
-		fmt.Println("Error marshalling DSU to file:", err)
-		return err
-	}
-
-	err = os.WriteFile(filename, data, 0644)
-	if err != nil {
-		fmt.Println("Error writing DSU to file:", err)
-		return err
-	}
-
-	return nil
-}
 
 // MarshalJSON implements json.Marshaler interface
 func (d *dsu) MarshalJSON() ([]byte, error) {
+	d.lock.RLock()
+	defer d.lock.RUnlock()
+
 	return json.Marshal(map[string]interface{}{
 		"root":   d.root,
 		"rank":   d.rank,
