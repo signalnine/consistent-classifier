@@ -25,6 +25,12 @@ type Classifier struct {
 	totalClassifications int
 	cacheHits            int
 	metricsLock          sync.RWMutex
+
+	// Background task tracking for graceful shutdown
+	backgroundTasks sync.WaitGroup
+	shutdownOnce    sync.Once
+	closing         bool
+	closeLock       sync.RWMutex
 }
 
 // NewClassifier creates a new Classifier with the given configuration
@@ -36,28 +42,44 @@ func NewClassifier(cfg Config) (*Classifier, error) {
 	if cfg.EmbeddingClient != nil {
 		embeddingClient = cfg.EmbeddingClient
 	} else {
-		embeddingClient = NewVoyageEmbeddingAdapter(nil)
+		client, err := NewVoyageEmbeddingAdapter(nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default embedding client: %w", err)
+		}
+		embeddingClient = client
 	}
 
 	var vectorClientLabel VectorClient
 	if cfg.VectorClientLabel != nil {
 		vectorClientLabel = cfg.VectorClientLabel
 	} else {
-		vectorClientLabel = NewPineconeVectorAdapter(nil, nil, "label")
+		client, err := NewPineconeVectorAdapter(nil, nil, "label")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default vector client (label): %w", err)
+		}
+		vectorClientLabel = client
 	}
 
 	var vectorClientContent VectorClient
 	if cfg.VectorClientContent != nil {
 		vectorClientContent = cfg.VectorClientContent
 	} else {
-		vectorClientContent = NewPineconeVectorAdapter(nil, nil, "content")
+		client, err := NewPineconeVectorAdapter(nil, nil, "content")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default vector client (content): %w", err)
+		}
+		vectorClientContent = client
 	}
 
 	var llmClient LLMClient
 	if cfg.LLMClient != nil {
 		llmClient = cfg.LLMClient
 	} else {
-		llmClient = NewDefaultLLMClient(nil, "production")
+		client, err := NewDefaultLLMClient(nil, "production")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create default LLM client: %w", err)
+		}
+		llmClient = client
 	}
 
 	var dsuPersist DisjointSetPersistence
@@ -86,6 +108,14 @@ func NewClassifier(cfg Config) (*Classifier, error) {
 
 // Classify classifies the given text and returns the classification result
 func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error) {
+	// Check if classifier is shutting down
+	c.closeLock.RLock()
+	if c.closing {
+		c.closeLock.RUnlock()
+		return nil, fmt.Errorf("classifier is shutting down")
+	}
+	c.closeLock.RUnlock()
+
 	userFacingStart := time.Now()
 
 	// Step 1: Generate embedding for this text
@@ -131,13 +161,17 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 	userFacingLatency := time.Since(userFacingStart)
 	c.recordClassification()
 
+	// Track background task for graceful shutdown
+	c.backgroundTasks.Add(1)
+	defer c.backgroundTasks.Done()
+
 	// Background processing - run asynchronously but wait for completion
 	backgroundStart := time.Now()
 	err = c.processBackgroundTasks(ctx, text, embedding, label)
 	if err != nil {
 		// Don't fail the classification, just log the error
 		// In production you might want to handle this differently
-		log.Printf("Warning: background processing failed: %v\n", err)
+		log.Printf("Error: background processing failed: %v\n", err)
 	}
 	backgroundLatency := time.Since(backgroundStart)
 
@@ -152,6 +186,13 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 
 // processBackgroundTasks handles label clustering and vector caching
 func (c *Classifier) processBackgroundTasks(ctx context.Context, text string, embedding []float32, label string) error {
+	// Check if context is already cancelled
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	var wg sync.WaitGroup
 	errChan := make(chan error, 3)
 
@@ -159,6 +200,12 @@ func (c *Classifier) processBackgroundTasks(ctx context.Context, text string, em
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			errChan <- ctx.Err()
+			return
+		default:
+		}
 		if err := c.updateLabelClustering(ctx, label); err != nil {
 			errChan <- fmt.Errorf("label clustering failed: %w", err)
 		}
@@ -168,6 +215,12 @@ func (c *Classifier) processBackgroundTasks(ctx context.Context, text string, em
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			errChan <- ctx.Err()
+			return
+		default:
+		}
 		if err := c.cacheTextEmbedding(ctx, text, embedding, label); err != nil {
 			errChan <- fmt.Errorf("text caching failed: %w", err)
 		}
@@ -177,6 +230,12 @@ func (c *Classifier) processBackgroundTasks(ctx context.Context, text string, em
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		select {
+		case <-ctx.Done():
+			errChan <- ctx.Err()
+			return
+		default:
+		}
 		if err := c.cacheLabelEmbedding(ctx, label); err != nil {
 			errChan <- fmt.Errorf("label caching failed: %w", err)
 		}
@@ -258,8 +317,32 @@ func (c *Classifier) cacheLabelEmbedding(ctx context.Context, label string) erro
 }
 
 // SaveDSU saves the current DSU state to persistent storage
+// This method is thread-safe and waits for any pending background tasks to complete
 func (c *Classifier) SaveDSU() error {
+	// Wait for all background tasks to complete before saving
+	c.backgroundTasks.Wait()
 	return c.dsuPersist.Save(c.dsu)
+}
+
+// Close gracefully shuts down the classifier, waiting for background tasks to complete
+// and saving the DSU state. It's safe to call Close multiple times.
+func (c *Classifier) Close() error {
+	var saveErr error
+
+	c.shutdownOnce.Do(func() {
+		// Mark as closing to reject new classifications
+		c.closeLock.Lock()
+		c.closing = true
+		c.closeLock.Unlock()
+
+		// Wait for all background tasks to complete
+		c.backgroundTasks.Wait()
+
+		// Save DSU state
+		saveErr = c.dsuPersist.Save(c.dsu)
+	})
+
+	return saveErr
 }
 
 // GetMetrics returns current classification metrics

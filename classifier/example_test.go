@@ -26,20 +26,41 @@ func Example_basic() {
 	fmt.Printf("Cache Hit: %v\n", result.CacheHit)
 	fmt.Printf("Latency: %v\n", result.UserFacingLatency)
 
-	// Save DSU state
-	if err := clf.SaveDSU(); err != nil {
+	// Gracefully shutdown and save DSU state
+	if err := clf.Close(); err != nil {
 		log.Fatal(err)
 	}
 }
 
 // Example shows customizing the configuration
 func Example_customConfig() {
+	// Create clients
+	embeddingClient, err := classifier.NewVoyageEmbeddingAdapter(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	vectorClientLabel, err := classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_label")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	vectorClientContent, err := classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_content")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	llmClient, err := classifier.NewDefaultLLMClient(nil, "")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Customize configuration with higher similarity threshold
 	clf, err := classifier.NewClassifier(classifier.Config{
-		EmbeddingClient:     classifier.NewVoyageEmbeddingAdapter(nil),
-		VectorClientLabel:   classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_label"),
-		VectorClientContent: classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_content"),
-		LLMClient:           classifier.NewDefaultLLMClient(nil, ""),
+		EmbeddingClient:     embeddingClient,
+		VectorClientLabel:   vectorClientLabel,
+		VectorClientContent: vectorClientContent,
+		LLMClient:           llmClient,
 		MinSimilarity:       0.85, // Higher threshold for cache hits
 		DSUPersistence:      classifier.NewFileDSUPersistence("./my_labels.bin"),
 	})
@@ -61,8 +82,8 @@ func Example_customConfig() {
 	fmt.Printf("Converged Labels: %d\n", metrics.ConvergedLabels)
 	fmt.Printf("Cache Hit Rate: %.2f%%\n", metrics.CacheHitRate)
 
-	// Save state
-	if err := clf.SaveDSU(); err != nil {
+	// Gracefully shutdown and save state
+	if err := clf.Close(); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -5,7 +5,7 @@ import (
 )
 
 // MarshalJSON implements json.Marshaler interface
-func (d *dsu) MarshalJSON() ([]byte, error) {
+func (d *DSU) MarshalJSON() ([]byte, error) {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
@@ -17,7 +17,7 @@ func (d *dsu) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface
-func (d *dsu) UnmarshalJSON(data []byte) error {
+func (d *DSU) UnmarshalJSON(data []byte) error {
 	var temp struct {
 		Root   []int          `json:"root"`
 		Rank   []int          `json:"rank"`

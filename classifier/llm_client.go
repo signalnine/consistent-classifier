@@ -23,11 +23,14 @@ Rules:
 - Be consistent: similar texts should get the same label`
 
 // NewDefaultLLMClient creates a new LLM client using OpenAI with API key from environment
-func NewDefaultLLMClient(apiKey *string, systemPrompt string) *DefaultLLMClient {
-	loadEnvVar(apiKey, "OPENAI_API_KEY")
+func NewDefaultLLMClient(apiKey *string, systemPrompt string) (*DefaultLLMClient, error) {
+	key, err := loadEnvVar(apiKey, "OPENAI_API_KEY")
+	if err != nil {
+		return nil, err
+	}
 
 	instance := DefaultLLMClient{
-		client:       openai.NewClient(*apiKey),
+		client:       openai.NewClient(*key),
 		systemPrompt: defaultSystemPrompt,
 	}
 
@@ -35,7 +38,7 @@ func NewDefaultLLMClient(apiKey *string, systemPrompt string) *DefaultLLMClient 
 		instance.systemPrompt = systemPrompt
 	}
 
-	return &instance
+	return &instance, nil
 }
 
 // Classify classifies text into a category label using LLM

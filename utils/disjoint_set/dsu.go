@@ -5,9 +5,7 @@ import (
 )
 
 // DSU represents a Disjoint Set Union data structure
-type DSU = dsu
-
-type dsu struct {
+type DSU struct {
 	root       []int
 	rank       []int
 	labels     map[string]int
@@ -16,8 +14,8 @@ type dsu struct {
 }
 
 // NewDSU creates a new DSU with the given size.
-func NewDSU() *dsu {
-	return &dsu{
+func NewDSU() *DSU {
+	return &DSU{
 		root:       make([]int, 0),
 		rank:       make([]int, 0),
 		labels:     make(map[string]int),
@@ -27,7 +25,7 @@ func NewDSU() *dsu {
 }
 
 // Add adds a new group to the DSU. Returns the index of the new group.
-func (d *dsu) Add(label string) int {
+func (d *DSU) Add(label string) int {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -35,7 +33,7 @@ func (d *dsu) Add(label string) int {
 }
 
 // add adds a new group to the DSU. Returns the index of the new group. (internal, unlocked, caller must hold lock)
-func (d *dsu) add(label string) int {
+func (d *DSU) add(label string) int {
 	d.root = append(d.root, len(d.root))
 	d.rank = append(d.rank, 0)
 	d.labels[label] = len(d.root) - 1
@@ -44,7 +42,7 @@ func (d *dsu) add(label string) int {
 }
 
 // find finds the root of the set (internal, unlocked - caller must hold lock)
-func (d *dsu) find(x int) int {
+func (d *DSU) find(x int) int {
 	if d.root[x] == x {
 		return x
 	}
@@ -54,7 +52,7 @@ func (d *dsu) find(x int) int {
 }
 
 // FindOrCreate finds the root of the set by label, or adds it if it doesn't exist
-func (d *dsu) FindOrCreate(label string) int {
+func (d *DSU) FindOrCreate(label string) int {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -67,7 +65,7 @@ func (d *dsu) FindOrCreate(label string) int {
 }
 
 // Union merges two sets
-func (d *dsu) Union(x int, y int) {
+func (d *DSU) Union(x int, y int) {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
@@ -89,7 +87,7 @@ func (d *dsu) Union(x int, y int) {
 }
 
 // Connected checks if two elements are in the same set
-func (d *dsu) Connected(x int, y int) bool {
+func (d *DSU) Connected(x int, y int) bool {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
@@ -97,7 +95,7 @@ func (d *dsu) Connected(x int, y int) bool {
 }
 
 // Size returns the number of elements in the DSU
-func (d *dsu) Size() int {
+func (d *DSU) Size() int {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
@@ -105,7 +103,7 @@ func (d *dsu) Size() int {
 }
 
 // Labels returns all labels in the DSU
-func (d *dsu) Labels() []string {
+func (d *DSU) Labels() []string {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
@@ -117,7 +115,7 @@ func (d *dsu) Labels() []string {
 }
 
 // CountSets returns the number of unique sets in the DSU
-func (d *dsu) CountSets() int {
+func (d *DSU) CountSets() int {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 
@@ -131,7 +129,7 @@ func (d *dsu) CountSets() int {
 }
 
 // FindLabel finds the label by a root index or empty string if not found
-func (d *dsu) FindLabel(idx int) string {
+func (d *DSU) FindLabel(idx int) string {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
 

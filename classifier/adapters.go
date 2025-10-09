@@ -2,6 +2,7 @@ package classifier
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/FrenchMajesty/consistent-classifier/clients/pinecone"
@@ -17,12 +18,15 @@ type VoyageEmbeddingAdapter struct {
 }
 
 // NewVoyageEmbeddingAdapter creates a new adapter for Voyage AI
-func NewVoyageEmbeddingAdapter(apiKey *string) *VoyageEmbeddingAdapter {
-	loadEnvVar(apiKey, "VOYAGEAI_API_KEY")
+func NewVoyageEmbeddingAdapter(apiKey *string) (*VoyageEmbeddingAdapter, error) {
+	key, err := loadEnvVar(apiKey, "VOYAGEAI_API_KEY")
+	if err != nil {
+		return nil, err
+	}
 
 	return &VoyageEmbeddingAdapter{
-		client: voyage.NewEmbeddingService(*apiKey),
-	}
+		client: voyage.NewEmbeddingService(*key),
+	}, nil
 }
 
 // GenerateEmbedding implements EmbeddingClient interface
@@ -39,15 +43,30 @@ type PineconeVectorAdapter struct {
 }
 
 // NewPineconeVectorAdapter creates a new adapter for Pinecone
-func NewPineconeVectorAdapter(apiKey *string, host *string, namespace string) *PineconeVectorAdapter {
-	loadEnvVar(apiKey, "PINECONE_API_KEY")
-	loadEnvVar(host, "PINECONE_HOST")
+func NewPineconeVectorAdapter(apiKey *string, host *string, namespace string) (*PineconeVectorAdapter, error) {
+	key, err := loadEnvVar(apiKey, "PINECONE_API_KEY")
+	if err != nil {
+		return nil, err
+	}
 
-	client := pinecone.NewPineconeService(*apiKey)
-	index := client.ForBaseIndex(*host, namespace)
+	h, err := loadEnvVar(host, "PINECONE_HOST")
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := pinecone.NewPineconeService(*key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pinecone service: %w", err)
+	}
+
+	index, err := client.ForBaseIndex(*h, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to pinecone index: %w", err)
+	}
+
 	return &PineconeVectorAdapter{
 		index: index,
-	}
+	}, nil
 }
 
 // Search implements VectorClient interface
@@ -97,12 +116,13 @@ func (a *PineconeVectorAdapter) Upsert(ctx context.Context, id string, vector []
 }
 
 // loadEnvVar loads an environment variable into a pointer if no value is provided
-func loadEnvVar(target *string, envKey string) {
+func loadEnvVar(target *string, envKey string) (*string, error) {
 	if target == nil {
 		envVar := os.Getenv(envKey)
 		if envVar == "" {
-			panic(envKey + " environment variable not set and no " + envKey + " provided")
+			return nil, fmt.Errorf("%s environment variable not set and no value provided", envKey)
 		}
-		target = &envVar
+		return &envVar, nil
 	}
+	return target, nil
 }

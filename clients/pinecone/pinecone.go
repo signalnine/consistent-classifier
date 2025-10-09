@@ -3,49 +3,39 @@ package pinecone
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/pinecone-io/go-pinecone/pinecone"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-var (
-	// client is the singleton Pinecone client
-	client *pinecone.Client
-	once   sync.Once
-)
-
 // NewPineconeService creates a new Pinecone service instance using the official SDK
-func NewPineconeService(apiKey string) *pineconeService {
-	once.Do(func() {
-		pcClient, err := pinecone.NewClient(pinecone.NewClientParams{
-			ApiKey: apiKey,
-		})
-		if err != nil {
-			panic("Failed to initialize Pinecone client: " + err.Error())
-		}
-		client = pcClient
+func NewPineconeService(apiKey string) (*pineconeService, error) {
+	pcClient, err := pinecone.NewClient(pinecone.NewClientParams{
+		ApiKey: apiKey,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize Pinecone client: %w", err)
+	}
 
 	return &pineconeService{
-		client: client,
-	}
+		client: pcClient,
+	}, nil
 }
 
 // ForBaseIndex returns an index gateway for the base index
-func (ps *pineconeService) ForBaseIndex(host string, namespace string) *indexOperations {
+func (ps *pineconeService) ForBaseIndex(host string, namespace string) (*indexOperations, error) {
 	indexConnection, err := ps.client.Index(pinecone.NewIndexConnParams{
 		Host:      host,
 		Namespace: namespace,
 	})
 	if err != nil {
-		panic("Failed to initialize Pinecone client: " + err.Error())
+		return nil, fmt.Errorf("failed to connect to Pinecone index: %w", err)
 	}
 
 	return &indexOperations{
 		index: indexConnection,
-	}
+	}, nil
 }
 
 // FindById finds a vector by its ID
