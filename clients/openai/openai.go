@@ -39,6 +39,10 @@ type OpenAIClient struct {
 	RetryConfig retry.Config
 }
 
+type LanguageModelClient interface {
+	ChatCompletion(ctx context.Context, req groq.ChatCompletionRequest) (*groq.ChatCompletionResponse, error)
+}
+
 type OpenAIClientInterface interface {
 	ChatCompletion(ctx context.Context, req groq.ChatCompletionRequest) (*groq.ChatCompletionResponse, error)
 	ChatCompletionStream(ctx context.Context, req groq.ChatCompletionRequest, callback func(token string)) (*groq.StreamingResult, error)

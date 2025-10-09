@@ -1,0 +1,34 @@
+package classifier
+
+const (
+	// DefaultMinSimilarity is the default threshold for vector similarity matching
+	DefaultMinSimilarity = 0.80
+
+	// DefaultDSUFilePath is the default location for DSU state persistence
+	DefaultDSUFilePath = "./dsu_state.bin"
+)
+
+// Config holds configuration for the Classifier
+type Config struct {
+	// EmbeddingClient generates embeddings for text. If nil, returns error (must be provided).
+	EmbeddingClient EmbeddingClient
+
+	// VectorClient performs vector search and storage. If nil, returns error (must be provided).
+	VectorClient VectorClient
+
+	// LLMClient performs text classification. If nil, returns error (must be provided).
+	LLMClient LLMClient
+
+	// DSUPersistence handles loading/saving the label clustering state. If nil, uses file-based persistence at ./dsu_state.bin
+	DSUPersistence DisjointSetPersistence
+
+	// MinSimilarity is the threshold for vector similarity matching (0.0 to 1.0). If 0, uses DefaultMinSimilarity.
+	MinSimilarity float32
+}
+
+// applyDefaults fills in default values for unset config fields
+func (c *Config) applyDefaults() {
+	if c.MinSimilarity == 0 {
+		c.MinSimilarity = DefaultMinSimilarity
+	}
+}

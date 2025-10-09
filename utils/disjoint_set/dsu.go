@@ -1,9 +1,11 @@
 package disjoint_set
 
 import (
-	"os"
 	"sync"
 )
+
+// DSU represents a Disjoint Set Union data structure
+type DSU = dsu
 
 type dsu struct {
 	root   []int
@@ -123,9 +125,4 @@ func (d *dsu) CountSets() int {
 	}
 
 	return len(rootSet)
-}
-
-// Save saves the DSU to a file
-func (d *dsu) Save() error {
-	return d.writeToFile(os.Getenv("DSU_FILEPATH"))
 }
