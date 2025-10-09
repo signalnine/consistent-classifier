@@ -39,7 +39,7 @@ func Example_customConfig() {
 		EmbeddingClient:     classifier.NewVoyageEmbeddingAdapter(nil),
 		VectorClientLabel:   classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_label"),
 		VectorClientContent: classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_content"),
-		LLMClient:           classifier.NewDefaultLLMClient(nil, "production"),
+		LLMClient:           classifier.NewDefaultLLMClient(nil, ""),
 		MinSimilarity:       0.85, // Higher threshold for cache hits
 		DSUPersistence:      classifier.NewFileDSUPersistence("./my_labels.bin"),
 	})

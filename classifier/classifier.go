@@ -3,6 +3,7 @@ package classifier
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -136,7 +137,7 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 	if err != nil {
 		// Don't fail the classification, just log the error
 		// In production you might want to handle this differently
-		fmt.Printf("Warning: background processing failed: %v\n", err)
+		log.Printf("Warning: background processing failed: %v\n", err)
 	}
 	backgroundLatency := time.Since(backgroundStart)
 

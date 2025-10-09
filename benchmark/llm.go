@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/clients/groq"
 	"github.com/FrenchMajesty/consistent-classifier/clients/openai"
 )
 
@@ -63,7 +62,7 @@ func classifyTextWithLLM(post, reply string) (string, *TokenUsageMetrics, error)
 		return "", nil, fmt.Errorf("OPENAI_API_KEY environment variable not set")
 	}
 
-	client := openai.NewOpenAIClient(apiKey, "dev")
+	client := openai.NewClient(apiKey)
 
 	systemPrompt := `You are a text classification assistant. Given a user's response/reply, classify it into a concise category label.
 
@@ -75,15 +74,15 @@ Rules:
 
 	userPrompt := fmt.Sprintf("Original Post: %s\n\n\nUser Response: \"%s\"", post, reply)
 
-	req := groq.ChatCompletionRequest{
+	req := openai.ChatCompletionRequest{
 		Model: "gpt-4.1-mini",
-		Messages: []groq.ChatMessage{
+		Messages: []openai.ChatMessage{
 			{
-				Role:    groq.MessageRoleSystem,
+				Role:    openai.MessageRoleSystem,
 				Content: &systemPrompt,
 			},
 			{
-				Role:    groq.MessageRoleUser,
+				Role:    openai.MessageRoleUser,
 				Content: &userPrompt,
 			},
 		},

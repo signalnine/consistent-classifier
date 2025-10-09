@@ -130,7 +130,7 @@ func (d *dsu) CountSets() int {
 	return len(rootSet)
 }
 
-// FindLabel finds the label by a root index
+// FindLabel finds the label by a root index or empty string if not found
 func (d *dsu) FindLabel(idx int) string {
 	d.lock.RLock()
 	defer d.lock.RUnlock()
