@@ -10,12 +10,8 @@ import (
 
 // Example shows basic usage of the classifier
 func Example_basic() {
-	// Create classifier - all clients must be provided
-	clf, err := classifier.NewClassifier(classifier.Config{
-		EmbeddingClient: classifier.NewVoyageEmbeddingAdapter(),
-		VectorClient:    classifier.NewPineconeVectorAdapter("my_namespace"),
-		LLMClient:       classifier.NewDefaultLLMClient("your-api-key", "production", ""),
-	})
+	// Create classifier - no clients provided, rely on defaults with environment variables
+	clf, err := classifier.NewClassifier(classifier.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,11 +36,12 @@ func Example_basic() {
 func Example_customConfig() {
 	// Customize configuration with higher similarity threshold
 	clf, err := classifier.NewClassifier(classifier.Config{
-		EmbeddingClient: classifier.NewVoyageEmbeddingAdapter(),
-		VectorClient:    classifier.NewPineconeVectorAdapter("my_namespace"),
-		LLMClient:       classifier.NewDefaultLLMClient("your-api-key", "production", ""),
-		MinSimilarity:   0.85, // Higher threshold for cache hits
-		DSUPersistence:  classifier.NewFileDSUPersistence("./my_labels.bin"),
+		EmbeddingClient:     classifier.NewVoyageEmbeddingAdapter(nil),
+		VectorClientLabel:   classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_label"),
+		VectorClientContent: classifier.NewPineconeVectorAdapter(nil, nil, "my_namespace_content"),
+		LLMClient:           classifier.NewDefaultLLMClient(nil, "production"),
+		MinSimilarity:       0.85, // Higher threshold for cache hits
+		DSUPersistence:      classifier.NewFileDSUPersistence("./my_labels.bin"),
 	})
 	if err != nil {
 		log.Fatal(err)

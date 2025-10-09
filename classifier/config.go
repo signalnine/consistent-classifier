@@ -10,13 +10,14 @@ const (
 
 // Config holds configuration for the Classifier
 type Config struct {
-	// EmbeddingClient generates embeddings for text. If nil, returns error (must be provided).
+	// EmbeddingClient generates embeddings for text. If nil, uses the default (Voyage AI).
 	EmbeddingClient EmbeddingClient
 
-	// VectorClient performs vector search and storage. If nil, returns error (must be provided).
-	VectorClient VectorClient
+	// VectorClient performs vector search and storage. If nil, uses the default (Pinecone).
+	VectorClientLabel   VectorClient
+	VectorClientContent VectorClient
 
-	// LLMClient performs text classification. If nil, returns error (must be provided).
+	// LLMClient performs text classification. If nil, uses the default (OpenAI).
 	LLMClient LLMClient
 
 	// DSUPersistence handles loading/saving the label clustering state. If nil, uses file-based persistence at ./dsu_state.bin

@@ -23,9 +23,11 @@ Rules:
 - Be consistent: similar texts should get the same label`
 
 // NewDefaultLLMClient creates a new LLM client using OpenAI with API key from environment
-func NewDefaultLLMClient(apiKey string, systemPrompt string) *DefaultLLMClient {
+func NewDefaultLLMClient(apiKey *string, systemPrompt string) *DefaultLLMClient {
+	loadEnvVar(apiKey, "OPENAI_API_KEY")
+
 	instance := DefaultLLMClient{
-		client:       openai.NewClient(apiKey),
+		client:       openai.NewClient(*apiKey),
 		systemPrompt: defaultSystemPrompt,
 	}
 

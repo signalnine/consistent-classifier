@@ -30,18 +30,35 @@ type Classifier struct {
 func NewClassifier(cfg Config) (*Classifier, error) {
 	cfg.applyDefaults()
 
-	// Validate required clients are provided
-	if cfg.EmbeddingClient == nil {
-		return nil, fmt.Errorf("EmbeddingClient is required")
-	}
-	if cfg.VectorClient == nil {
-		return nil, fmt.Errorf("VectorClient is required")
-	}
-	if cfg.LLMClient == nil {
-		return nil, fmt.Errorf("LLMClient is required")
+	// Initialize clients
+	var embeddingClient EmbeddingClient
+	if cfg.EmbeddingClient != nil {
+		embeddingClient = cfg.EmbeddingClient
+	} else {
+		embeddingClient = NewVoyageEmbeddingAdapter(nil)
 	}
 
-	// Initialize DSU persistence (only field with a default)
+	var vectorClientLabel VectorClient
+	if cfg.VectorClientLabel != nil {
+		vectorClientLabel = cfg.VectorClientLabel
+	} else {
+		vectorClientLabel = NewPineconeVectorAdapter(nil, nil, "label")
+	}
+
+	var vectorClientContent VectorClient
+	if cfg.VectorClientContent != nil {
+		vectorClientContent = cfg.VectorClientContent
+	} else {
+		vectorClientContent = NewPineconeVectorAdapter(nil, nil, "content")
+	}
+
+	var llmClient LLMClient
+	if cfg.LLMClient != nil {
+		llmClient = cfg.LLMClient
+	} else {
+		llmClient = NewDefaultLLMClient(nil, "production")
+	}
+
 	var dsuPersist DisjointSetPersistence
 	if cfg.DSUPersistence != nil {
 		dsuPersist = cfg.DSUPersistence
@@ -56,10 +73,10 @@ func NewClassifier(cfg Config) (*Classifier, error) {
 	}
 
 	return &Classifier{
-		embedding:     cfg.EmbeddingClient,
-		vectorContent: cfg.VectorClient,
-		vectorLabel:   cfg.VectorClient, // Same client used for both content and label vectors
-		llm:           cfg.LLMClient,
+		embedding:     embeddingClient,
+		vectorContent: vectorClientContent,
+		vectorLabel:   vectorClientLabel,
+		llm:           llmClient,
 		dsu:           dsu,
 		dsuPersist:    dsuPersist,
 		minSimilarity: cfg.MinSimilarity,
