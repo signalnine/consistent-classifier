@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/FrenchMajesty/consistent-classifier/benchmark"
+	"github.com/FrenchMajesty/consistent-classifier/cmd/benchmark"
 	"github.com/joho/godotenv"
 )
 
