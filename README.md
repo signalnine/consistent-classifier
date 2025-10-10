@@ -107,9 +107,10 @@ llmClient, _ := adapters.NewDefaultLLMClient(nil, customPrompt, "gpt-4o", "")
 Works with any OpenAI-compatible API (e.g., Azure, local models):
 
 ```go
+groqApiKey := os.Getenv('GROQ_API_KEY')
 llmClient, _ := adapters.NewDefaultLLMClient(
-    nil,
-    "",  // system prompt
+    groqApiKey, // api key, fallbacks to envVar
+    "",  // system prompt, fallbacks to default
     "llama-3.370b-versatile",
     "https://api.groq.com/openai/v1", // base URL
 )
@@ -178,7 +179,7 @@ type Metrics struct {
 
 ### Rate Limiting
 
-The package doesn't enforce rate limits. For production use with high volume:
+⚠️ The package doesn't enforce rate limits. For production use with high volume, we recommend providing your own implementation of the `LanguageModelClient` interface:
 
 ```go
 // Wrap with your own rate limiter
@@ -215,8 +216,11 @@ go func() {
 For multiple instances or environments, use unique Pinecone namespaces:
 
 ```go
-vectorLabel, _ := adapters.NewPineconeVectorAdapter(nil, nil, "prod_labels_v2")
-vectorContent, _ := adapters.NewPineconeVectorAdapter(nil, nil, "prod_content_v2")
+apiKey := os.Getenv('PINECONE_API_KEY')
+labelHost := os.Getenv('PINECONE_LABEL_HOST')
+contentHost := os.Getenv('PINECONE_CONTENT_HOST')
+vectorLabel, _ := adapters.NewPineconeVectorAdapter(apiKey, labelHost, "prod_labels_v2")
+vectorContent, _ := adapters.NewPineconeVectorAdapter(apiKey, contentHost, "prod_content_v2")
 ```
 
 ## Testing
@@ -239,10 +243,12 @@ See [cmd/benchmark/vectorize.go](cmd/benchmark/vectorize.go) for a full example 
 ## Performance
 
 On a dataset of 10,000 tweet replies in a specific niche (using `cmd/benchmark`):
-- **Cache hit rate**: 25% hit rate after 500. Reaches +50% by 2,000
+- **Cache hit rate**: 25% hit rate after 500. Reaches +50% by 2,000 and over 95% by the 10,000th
 - **Avg latency (cache hit)**: <200ms
 - **Avg latency (cache miss)**: ~1-2s (LLM dependent)
 - **Cost reduction**: 90%+ fewer LLM calls vs naive classification
+
+Read the [full length blog post](https://google.com) where I go more in depth on the performance.
 
 ## Architecture
 
