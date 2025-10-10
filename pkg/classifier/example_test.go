@@ -58,12 +58,13 @@ func Example_customConfig() {
 
 	// Customize configuration with higher similarity threshold
 	clf, err := classifier.NewClassifier(classifier.Config{
-		EmbeddingClient:     embeddingClient,
-		VectorClientLabel:   vectorClientLabel,
-		VectorClientContent: vectorClientContent,
-		LLMClient:           llmClient,
-		MinSimilarity:       0.85, // Higher threshold for cache hits
-		DSUPersistence:      classifier.NewFileDSUPersistence("./my_labels.bin"),
+		EmbeddingClient:      embeddingClient,
+		VectorClientLabel:    vectorClientLabel,
+		VectorClientContent:  vectorClientContent,
+		LLMClient:            llmClient,
+		MinSimilarityContent: 0.90, // Higher threshold for cache hits
+		MinSimilarityLabel:   0.75, // Lower threshold for cache hits
+		DSUPersistence:       classifier.NewFileDSUPersistence("./my_labels.bin"),
 	})
 	if err != nil {
 		log.Fatal(err)

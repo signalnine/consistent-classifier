@@ -43,8 +43,6 @@ func NewDefaultLLMClient(apiKey *string, systemPrompt string) (*DefaultLLMClient
 
 // Classify classifies text into a category label using LLM
 func (c *DefaultLLMClient) Classify(ctx context.Context, text string) (string, error) {
-	userPrompt := fmt.Sprintf("Text to classify: \"%s\"", text)
-
 	req := openai.ChatCompletionRequest{
 		Model: "gpt-4o-mini",
 		Messages: []openai.ChatMessage{
@@ -54,7 +52,7 @@ func (c *DefaultLLMClient) Classify(ctx context.Context, text string) (string, e
 			},
 			{
 				Role:    openai.MessageRoleUser,
-				Content: &userPrompt,
+				Content: &text,
 			},
 		},
 		Temperature:         0.3,

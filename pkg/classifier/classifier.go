@@ -14,13 +14,14 @@ import (
 
 // Classifier performs text classification with vector caching and label clustering
 type Classifier struct {
-	embedding     EmbeddingClient
-	vectorContent VectorClient
-	vectorLabel   VectorClient
-	llm           LLMClient
-	dsu           *disjoint_set.DSU
-	dsuPersist    DisjointSetPersistence
-	minSimilarity float32
+	embedding            EmbeddingClient
+	vectorContent        VectorClient
+	vectorLabel          VectorClient
+	llm                  LLMClient
+	dsu                  *disjoint_set.DSU
+	dsuPersist           DisjointSetPersistence
+	minSimilarityContent float32
+	minSimilarityLabel   float32
 
 	// Metrics tracking
 	totalClassifications int
@@ -97,13 +98,14 @@ func NewClassifier(cfg Config) (*Classifier, error) {
 	}
 
 	return &Classifier{
-		embedding:     embeddingClient,
-		vectorContent: vectorClientContent,
-		vectorLabel:   vectorClientLabel,
-		llm:           llmClient,
-		dsu:           dsu,
-		dsuPersist:    dsuPersist,
-		minSimilarity: cfg.MinSimilarity,
+		embedding:            embeddingClient,
+		vectorContent:        vectorClientContent,
+		vectorLabel:          vectorClientLabel,
+		llm:                  llmClient,
+		dsu:                  dsu,
+		dsuPersist:           dsuPersist,
+		minSimilarityContent: cfg.MinSimilarityContent,
+		minSimilarityLabel:   cfg.MinSimilarityLabel,
 	}, nil
 }
 
@@ -132,7 +134,7 @@ func (c *Classifier) Classify(ctx context.Context, text string) (*Result, error)
 	}
 
 	// Check if we have a cache hit
-	if len(matches) > 0 && matches[0].Score >= c.minSimilarity {
+	if len(matches) > 0 && matches[0].Score >= c.minSimilarityContent {
 		// Cache HIT - return cached label
 		userFacingLatency := time.Since(userFacingStart)
 		label, ok := matches[0].Metadata["label"].(string)
@@ -271,7 +273,7 @@ func (c *Classifier) updateLabelClustering(ctx context.Context, label string) er
 
 	// Find the root label
 	rootLabel := label
-	if len(matches) > 0 && matches[0].Score >= c.minSimilarity {
+	if len(matches) > 0 && matches[0].Score >= c.minSimilarityLabel {
 		root, ok := matches[0].Metadata["root"].(string)
 		if ok {
 			rootLabel = root

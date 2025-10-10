@@ -24,12 +24,17 @@ type Config struct {
 	DSUPersistence DisjointSetPersistence
 
 	// MinSimilarity is the threshold for vector similarity matching (0.0 to 1.0). If 0, uses DefaultMinSimilarity.
-	MinSimilarity float32
+	MinSimilarityContent float32
+	MinSimilarityLabel   float32
 }
 
 // applyDefaults fills in default values for unset config fields
 func (c *Config) applyDefaults() {
-	if c.MinSimilarity == 0 {
-		c.MinSimilarity = DefaultMinSimilarity
+	if c.MinSimilarityContent == 0 {
+		c.MinSimilarityContent = DefaultMinSimilarity
+	}
+
+	if c.MinSimilarityLabel == 0 {
+		c.MinSimilarityLabel = DefaultMinSimilarity
 	}
 }
