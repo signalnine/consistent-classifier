@@ -26,7 +26,9 @@ go.work.sum
 venv/*
 
 tweet_replies.csv
-llm_requests/
+dump_llm_requests/
 metrics_*.json
 results_*.json
 dsu.json
+dsu_state.bin
+/charts/*

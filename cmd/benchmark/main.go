@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/FrenchMajesty/consistent-classifier/cmd/benchmark"
 	"github.com/joho/godotenv"
 )
 
@@ -39,11 +38,11 @@ func main() {
 	switch *classifyMode {
 	case "llm":
 		fmt.Println("Running LLM classification...")
-		benchmark.LLM(datasetLimit)
+		LLM(datasetLimit)
 		fmt.Println("LLM classification complete!")
 	case "vectorize":
 		fmt.Println("Running vector clustering classification...")
-		benchmark.Vectorize(datasetLimit)
+		Vectorize(datasetLimit)
 		fmt.Println("Vector clustering classification complete!")
 	case "":
 		log.Fatal("Please specify a classification mode with --classify=llm or --classify=vectorize")

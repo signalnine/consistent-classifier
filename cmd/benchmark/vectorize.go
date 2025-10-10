@@ -1,9 +1,10 @@
-package benchmark
+package main
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
@@ -40,7 +41,11 @@ func Vectorize(limit int) {
 		}
 
 		// Use the classifier to classify the tweet reply
-		result, err := clf.Classify(context.Background(), tweet.UserResponse)
+		var text strings.Builder
+		text.WriteString("Post: \n" + tweet.Content)
+		text.WriteString("Reply: \n" + tweet.UserResponse)
+		text.WriteString("\nNow, classify the user reply.")
+		result, err := clf.Classify(context.Background(), text.String())
 		if err != nil {
 			log.Fatal(err)
 		}
