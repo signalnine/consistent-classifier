@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier/adapters"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 	"github.com/google/uuid"
 )
 

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/openai"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/openai"
 )
 
 func LLM(limit int) {

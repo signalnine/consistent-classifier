@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
+	"github.com/FrenchMajesty/consistent-classifier/adapters"
+	"github.com/FrenchMajesty/consistent-classifier"
 )
 
 // Example shows basic usage of the classifier

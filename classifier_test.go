@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/testutil"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/types"
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier"
+	"github.com/FrenchMajesty/consistent-classifier/testutil"
+	"github.com/FrenchMajesty/consistent-classifier/types"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 )
 
 // TestClassifier_CacheHit tests that the classifier returns cached results when similarity exceeds threshold

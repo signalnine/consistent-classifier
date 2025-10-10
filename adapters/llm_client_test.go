@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
+	"github.com/FrenchMajesty/consistent-classifier/adapters"
 )
 
 // Tests

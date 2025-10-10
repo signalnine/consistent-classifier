@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/openai"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/openai"
 )
 
 // DefaultLLMClient implements LLMClient using OpenAI

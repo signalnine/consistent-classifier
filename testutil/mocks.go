@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/types"
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier/types"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 )
 
 // MockEmbeddingClient is a mock implementation of EmbeddingClient for testing

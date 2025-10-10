@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 )
 
 // FileDSUPersistence implements DSUPersistence using file-based storage

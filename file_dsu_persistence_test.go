@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 )
 
 func TestFileDSUPersistence_Load_NonExistentFile(t *testing.T) {

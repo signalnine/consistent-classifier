@@ -6,9 +6,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/pinecone"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/types"
+	"github.com/FrenchMajesty/consistent-classifier/adapters"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/pinecone"
+	"github.com/FrenchMajesty/consistent-classifier/types"
 )
 
 // Mock implementations for testing

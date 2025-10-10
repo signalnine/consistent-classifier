@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/pinecone"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/voyage"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/types"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/pinecone"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/voyage"
+	"github.com/FrenchMajesty/consistent-classifier/types"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 

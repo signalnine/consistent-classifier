@@ -3,8 +3,8 @@ package classifier
 import (
 	"context"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/types"
-	"github.com/FrenchMajesty/consistent-classifier/utils/disjoint_set"
+	"github.com/FrenchMajesty/consistent-classifier/types"
+	"github.com/FrenchMajesty/consistent-classifier/internal/disjoint_set"
 )
 
 // EmbeddingClient generates vector embeddings for text

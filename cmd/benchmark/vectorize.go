@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
+	"github.com/FrenchMajesty/consistent-classifier"
 )
 
 // Vectorize will classify texts using Bag of Words (BoW) vector clustering.

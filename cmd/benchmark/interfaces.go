@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/pinecone"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/voyage"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/pinecone"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/voyage"
 	"github.com/austinfhunter/voyageai"
 )
 

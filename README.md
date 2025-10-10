@@ -27,7 +27,7 @@ import (
     "context"
     "log"
 
-    "github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
+    classifier "github.com/FrenchMajesty/consistent-classifier"
 )
 
 func main() {
@@ -66,8 +66,8 @@ export OPENAI_API_KEY="your-openai-key"
 
 ```go
 import (
-    "github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
-    "github.com/FrenchMajesty/consistent-classifier/pkg/classifier"
+    classifier "github.com/FrenchMajesty/consistent-classifier"
+    "github.com/FrenchMajesty/consistent-classifier/adapters"
 )
 
 // Create custom clients
@@ -230,7 +230,7 @@ vectorContent, _ := adapters.NewPineconeVectorAdapter(apiKey, contentHost, "prod
 go test ./...
 
 # Run with coverage
-go test -cover ./pkg/...
+go test -cover ./...
 
 # Run benchmarks
 go test -bench=. ./...
@@ -248,26 +248,24 @@ On a dataset of 10,000 tweet replies in a specific niche (using `cmd/benchmark`)
 - **Avg latency (cache miss)**: ~1-2s (LLM dependent)
 - **Cost reduction**: 90%+ fewer LLM calls vs naive classification
 
-Read the [full length blog post](https://google.com) where I go more in depth on the performance.
+Read the [full length essay](https://verdik.substack.com/p/how-to-get-consistent-classification) where I go more in depth on the performance.
 
 ## Architecture
 
 ```
-pkg/
-├── classifier/         # Core classification logic
-│   ├── classifier.go   # Main Classifier implementation
-│   ├── config.go       # Configuration and defaults
-│   ├── interfaces.go   # Client interfaces
-│   └── types.go        # Result and Metrics types
+consistent-classifier/
+├── *.go                # Core classification logic (classifier, config, types, etc.)
 ├── adapters/           # External service adapters
 │   ├── adapters.go     # Voyage and Pinecone adapters
 │   ├── llm_client.go   # OpenAI adapter
 │   ├── openai/         # OpenAI client implementation
 │   ├── pinecone/       # Pinecone client implementation
 │   └── voyage/         # Voyage AI client implementation
-└── types/              # Shared types
-
-utils/disjoint_set/     # DSU implementation for label clustering
+├── types/              # Shared types
+├── internal/
+│   └── disjoint_set/   # DSU implementation for label clustering
+└── cmd/
+    └── benchmark/      # Benchmarking utilities
 ```
 
 ## Contributing

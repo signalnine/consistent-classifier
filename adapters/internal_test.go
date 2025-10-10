@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/openai"
+	"github.com/FrenchMajesty/consistent-classifier/adapters/openai"
 )
 
 // Tests for unexported functions and internal behavior
