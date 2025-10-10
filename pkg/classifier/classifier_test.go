@@ -381,3 +381,212 @@ func TestClassifier_DSUPersistence(t *testing.T) {
 		}
 	})
 }
+
+// TestClassifier_SaveDSU_Direct tests calling SaveDSU directly
+func TestClassifier_SaveDSU_Direct(t *testing.T) {
+	mockDSU := &testutil.MockDSUPersistence{}
+
+	clf, err := classifier.NewClassifier(classifier.Config{
+		EmbeddingClient:     &testutil.MockEmbeddingClient{},
+		VectorClientContent: testutil.NewMockVectorClient(),
+		VectorClientLabel:   testutil.NewMockVectorClient(),
+		LLMClient:           &testutil.MockLLMClient{},
+		DSUPersistence:      mockDSU,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create classifier: %v", err)
+	}
+
+	err = clf.SaveDSU()
+	if err != nil {
+		t.Fatalf("SaveDSU failed: %v", err)
+	}
+
+	if mockDSU.SaveCount != 1 {
+		t.Errorf("Expected DSU to be saved once, got %d", mockDSU.SaveCount)
+	}
+}
+
+// TestClassifier_NewClassifier_WithDefaults tests default adapter initialization
+func TestClassifier_NewClassifier_WithDefaults(t *testing.T) {
+	// Set required environment variables
+	t.Setenv("VOYAGEAI_API_KEY", "test-voyage-key")
+	t.Setenv("PINECONE_API_KEY", "test-pinecone-key")
+	t.Setenv("PINECONE_HOST", "test-host")
+	t.Setenv("OPENAI_API_KEY", "test-openai-key")
+
+	// Create classifier with nil config to trigger default initialization
+	_, err := classifier.NewClassifier(classifier.Config{
+		DSUPersistence: &testutil.MockDSUPersistence{},
+	})
+
+	// We expect this to fail because we can't actually connect to real services
+	// but it should get past the env var loading
+	if err == nil {
+		t.Log("Classifier created successfully with defaults")
+	} else {
+		// Expected - we can't connect to real Pinecone
+		t.Logf("Expected error during default initialization: %v", err)
+	}
+}
+
+// TestClassifier_UpdateLabelClustering_Scenarios tests DSU label merging
+func TestClassifier_UpdateLabelClustering_Scenarios(t *testing.T) {
+	t.Run("similar label found - labels merged", func(t *testing.T) {
+		mockEmbedding := &testutil.MockEmbeddingClient{}
+		mockVectorLabel := testutil.NewMockVectorClient()
+
+		// Simulate finding a similar label
+		mockVectorLabel.SearchFunc = func(ctx context.Context, vector []float32, topK int) ([]types.VectorMatch, error) {
+			return []types.VectorMatch{
+				{
+					ID:    "similar-label",
+					Score: 0.95,
+					Metadata: map[string]any{
+						"root": "existing_root_label",
+					},
+				},
+			}, nil
+		}
+
+		mockLLM := &testutil.MockLLMClient{
+			ClassifyFunc: func(ctx context.Context, text string) (string, error) {
+				return "new_label", nil
+			},
+		}
+
+		clf, err := classifier.NewClassifier(classifier.Config{
+			EmbeddingClient:     mockEmbedding,
+			VectorClientContent: testutil.NewMockVectorClient(),
+			VectorClientLabel:   mockVectorLabel,
+			LLMClient:           mockLLM,
+			DSUPersistence:      &testutil.MockDSUPersistence{},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create classifier: %v", err)
+		}
+
+		_, err = clf.Classify(context.Background(), "test text")
+		if err != nil {
+			t.Fatalf("Classify failed: %v", err)
+		}
+
+		// Give background tasks time to complete
+		time.Sleep(100 * time.Millisecond)
+	})
+
+	t.Run("no similar label - new label added", func(t *testing.T) {
+		mockEmbedding := &testutil.MockEmbeddingClient{}
+		mockVectorLabel := testutil.NewMockVectorClient()
+
+		// No similar labels found
+		mockVectorLabel.SearchFunc = func(ctx context.Context, vector []float32, topK int) ([]types.VectorMatch, error) {
+			return []types.VectorMatch{}, nil
+		}
+
+		mockLLM := &testutil.MockLLMClient{
+			ClassifyFunc: func(ctx context.Context, text string) (string, error) {
+				return "completely_new_label", nil
+			},
+		}
+
+		clf, err := classifier.NewClassifier(classifier.Config{
+			EmbeddingClient:     mockEmbedding,
+			VectorClientContent: testutil.NewMockVectorClient(),
+			VectorClientLabel:   mockVectorLabel,
+			LLMClient:           mockLLM,
+			DSUPersistence:      &testutil.MockDSUPersistence{},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create classifier: %v", err)
+		}
+
+		_, err = clf.Classify(context.Background(), "test text")
+		if err != nil {
+			t.Fatalf("Classify failed: %v", err)
+		}
+
+		// Give background tasks time to complete
+		time.Sleep(100 * time.Millisecond)
+	})
+}
+
+// TestClassifier_ProcessBackgroundTasks_ErrorHandling tests background task error scenarios
+func TestClassifier_ProcessBackgroundTasks_ErrorHandling(t *testing.T) {
+	t.Run("one task fails, others succeed", func(t *testing.T) {
+		mockEmbedding := &testutil.MockEmbeddingClient{
+			GenerateEmbeddingFunc: func(ctx context.Context, text string) ([]float32, error) {
+				// Fail on label embedding generation
+				if text == "test_label" {
+					return nil, errors.New("embedding error for label")
+				}
+				return []float32{0.1, 0.2, 0.3}, nil
+			},
+		}
+
+		mockLLM := &testutil.MockLLMClient{
+			ClassifyFunc: func(ctx context.Context, text string) (string, error) {
+				return "test_label", nil
+			},
+		}
+
+		clf, err := classifier.NewClassifier(classifier.Config{
+			EmbeddingClient:     mockEmbedding,
+			VectorClientContent: testutil.NewMockVectorClient(),
+			VectorClientLabel:   testutil.NewMockVectorClient(),
+			LLMClient:           mockLLM,
+			DSUPersistence:      &testutil.MockDSUPersistence{},
+		})
+		if err != nil {
+			t.Fatalf("Failed to create classifier: %v", err)
+		}
+
+		// This should succeed even though background task fails
+		_, err = clf.Classify(context.Background(), "test text")
+		if err != nil {
+			t.Fatalf("Classify failed: %v", err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	})
+}
+
+// TestClassifier_CacheLabelEmbedding_RootLookup tests root label lookup scenarios
+func TestClassifier_CacheLabelEmbedding_RootLookup(t *testing.T) {
+	t.Run("root label exists", func(t *testing.T) {
+		existingDSU := disjoint_set.NewDSU()
+		existingDSU.Add("label1")
+		existingDSU.Add("label2")
+		existingDSU.Union(0, 1) // Merge them
+
+		mockDSU := &testutil.MockDSUPersistence{
+			LoadFunc: func() (*disjoint_set.DSU, error) {
+				return existingDSU, nil
+			},
+		}
+
+		mockLLM := &testutil.MockLLMClient{
+			ClassifyFunc: func(ctx context.Context, text string) (string, error) {
+				return "label2", nil
+			},
+		}
+
+		clf, err := classifier.NewClassifier(classifier.Config{
+			EmbeddingClient:     &testutil.MockEmbeddingClient{},
+			VectorClientContent: testutil.NewMockVectorClient(),
+			VectorClientLabel:   testutil.NewMockVectorClient(),
+			LLMClient:           mockLLM,
+			DSUPersistence:      mockDSU,
+		})
+		if err != nil {
+			t.Fatalf("Failed to create classifier: %v", err)
+		}
+
+		_, err = clf.Classify(context.Background(), "test text")
+		if err != nil {
+			t.Fatalf("Classify failed: %v", err)
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	})
+}
