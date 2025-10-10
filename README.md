@@ -1,5 +1,9 @@
 # Consistent Classifier
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/FrenchMajesty/consistent-classifier.svg)](https://pkg.go.dev/github.com/FrenchMajesty/consistent-classifier)
+
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+
 A high-performance Go package for classifying large volumes of unlabeled text data using LLM-powered classification with intelligent caching and label clustering.
 
 ## Features
