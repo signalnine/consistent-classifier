@@ -12,8 +12,11 @@ import (
 type DefaultLLMClient struct {
 	client       openai.LanguageModelClient
 	systemPrompt string
+	model        string
+	baseUrl      string
 }
 
+const defaultModel = "gpt-4.1-mini"
 const defaultSystemPrompt = `You are a text classification assistant. Given a text, classify it into a concise category label.
 
 Rules:
@@ -23,7 +26,7 @@ Rules:
 - Be consistent: similar texts should get the same label`
 
 // NewDefaultLLMClient creates a new LLM client using OpenAI with API key from environment
-func NewDefaultLLMClient(apiKey *string, systemPrompt string) (*DefaultLLMClient, error) {
+func NewDefaultLLMClient(apiKey *string, systemPrompt string, model string, baseUrl string) (*DefaultLLMClient, error) {
 	key, err := loadEnvVar(apiKey, "OPENAI_API_KEY")
 	if err != nil {
 		return nil, err
@@ -32,10 +35,16 @@ func NewDefaultLLMClient(apiKey *string, systemPrompt string) (*DefaultLLMClient
 	instance := DefaultLLMClient{
 		client:       openai.NewClient(*key),
 		systemPrompt: defaultSystemPrompt,
+		model:        defaultModel,
+		baseUrl:      baseUrl,
 	}
 
 	if systemPrompt != "" {
 		instance.systemPrompt = systemPrompt
+	}
+
+	if model != "" {
+		instance.model = model
 	}
 
 	return &instance, nil
@@ -44,7 +53,7 @@ func NewDefaultLLMClient(apiKey *string, systemPrompt string) (*DefaultLLMClient
 // Classify classifies text into a category label using LLM
 func (c *DefaultLLMClient) Classify(ctx context.Context, text string) (string, error) {
 	req := openai.ChatCompletionRequest{
-		Model: "gpt-4o-mini",
+		Model: c.model,
 		Messages: []openai.ChatMessage{
 			{
 				Role:    openai.MessageRoleSystem,

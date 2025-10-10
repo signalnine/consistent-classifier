@@ -223,6 +223,7 @@ func TestPineconeVectorAdapter_Upsert_Internal(t *testing.T) {
 // Mock OpenAI client for internal testing
 type mockLLMOpenAIClient struct {
 	chatCompletionFunc func(ctx context.Context, req openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error)
+	setBaseURLFunc     func(baseUrl string)
 }
 
 func (m *mockLLMOpenAIClient) ChatCompletion(ctx context.Context, req openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
@@ -230,4 +231,10 @@ func (m *mockLLMOpenAIClient) ChatCompletion(ctx context.Context, req openai.Cha
 		return m.chatCompletionFunc(ctx, req)
 	}
 	return nil, errors.New("not implemented")
+}
+
+func (m *mockLLMOpenAIClient) SetBaseURL(baseUrl string) {
+	if m.setBaseURLFunc != nil {
+		m.setBaseURLFunc(baseUrl)
+	}
 }

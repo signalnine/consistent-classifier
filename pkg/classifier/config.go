@@ -19,6 +19,8 @@ type Config struct {
 
 	// LLMClient performs text classification. If nil, uses the default (OpenAI).
 	LLMClient LLMClient
+	Model     string
+	BaseUrl   string
 
 	// DSUPersistence handles loading/saving the label clustering state. If nil, uses file-based persistence at ./dsu_state.bin
 	DSUPersistence DisjointSetPersistence

@@ -1,41 +1,17 @@
 package adapters_test
 
 import (
-	"context"
 	"os"
 	"testing"
 
 	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters"
-	"github.com/FrenchMajesty/consistent-classifier/pkg/adapters/openai"
 )
-
-// Mock OpenAI client for testing
-
-type mockOpenAIClient struct {
-	chatCompletionFunc func(ctx context.Context, req openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error)
-}
-
-func (m *mockOpenAIClient) ChatCompletion(ctx context.Context, req openai.ChatCompletionRequest) (*openai.ChatCompletionResponse, error) {
-	if m.chatCompletionFunc != nil {
-		return m.chatCompletionFunc(ctx, req)
-	}
-	content := "test_label"
-	return &openai.ChatCompletionResponse{
-		Choices: []openai.ChatCompletionChoice{
-			{
-				Message: openai.ChatMessage{
-					Content: &content,
-				},
-			},
-		},
-	}, nil
-}
 
 // Tests
 
 func TestNewDefaultLLMClient_WithAPIKey(t *testing.T) {
 	apiKey := "test-openai-key"
-	client, err := adapters.NewDefaultLLMClient(&apiKey, "")
+	client, err := adapters.NewDefaultLLMClient(&apiKey, "", "", "")
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -49,7 +25,7 @@ func TestNewDefaultLLMClient_WithAPIKey(t *testing.T) {
 func TestNewDefaultLLMClient_FromEnv(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "env-openai-key")
 
-	client, err := adapters.NewDefaultLLMClient(nil, "")
+	client, err := adapters.NewDefaultLLMClient(nil, "", "", "")
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -63,7 +39,7 @@ func TestNewDefaultLLMClient_FromEnv(t *testing.T) {
 func TestNewDefaultLLMClient_MissingKey(t *testing.T) {
 	os.Unsetenv("OPENAI_API_KEY")
 
-	_, err := adapters.NewDefaultLLMClient(nil, "")
+	_, err := adapters.NewDefaultLLMClient(nil, "", "", "")
 
 	if err == nil {
 		t.Error("Expected error when API key is missing, got nil")
@@ -74,7 +50,7 @@ func TestNewDefaultLLMClient_CustomPrompt(t *testing.T) {
 	apiKey := "test-key"
 	customPrompt := "You are a custom classifier"
 
-	client, err := adapters.NewDefaultLLMClient(&apiKey, customPrompt)
+	client, err := adapters.NewDefaultLLMClient(&apiKey, customPrompt, "", "")
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -88,7 +64,7 @@ func TestNewDefaultLLMClient_CustomPrompt(t *testing.T) {
 func TestNewDefaultLLMClient_DefaultPrompt(t *testing.T) {
 	apiKey := "test-key"
 
-	client, err := adapters.NewDefaultLLMClient(&apiKey, "")
+	client, err := adapters.NewDefaultLLMClient(&apiKey, "", "", "")
 
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
@@ -143,4 +119,3 @@ func TestDefaultLLMClient_ErrorScenarios(t *testing.T) {
 		// Would test handling of nil message content
 	})
 }
-

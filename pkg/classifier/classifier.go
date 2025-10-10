@@ -77,7 +77,7 @@ func NewClassifier(cfg Config) (*Classifier, error) {
 	if cfg.LLMClient != nil {
 		llmClient = cfg.LLMClient
 	} else {
-		client, err := adapters.NewDefaultLLMClient(nil, "production")
+		client, err := adapters.NewDefaultLLMClient(nil, "", cfg.Model, cfg.BaseUrl)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create default LLM client: %w", err)
 		}

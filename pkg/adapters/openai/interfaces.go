@@ -13,15 +13,15 @@ type OpenAIClient struct {
 	APIKey       string
 	Env          string
 	DumpRequests bool
+	BaseURL      string
 	HTTPClient   *http.Client
 	RetryConfig  retry.Config
 }
 
 type LanguageModelClient interface {
 	ChatCompletion(ctx context.Context, req ChatCompletionRequest) (*ChatCompletionResponse, error)
+	SetBaseURL(baseUrl string)
 }
-
-var _ LanguageModelClient = (*OpenAIClient)(nil)
 
 // ChatCompletionRequest is the request body for the chat completion endpoint
 type ChatCompletionRequest struct {
